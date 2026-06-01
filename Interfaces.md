@@ -114,6 +114,7 @@ Each Edge Function must:
 * avoid exposing service-role credentials
 * return safe error messages
 * avoid leaking internal stack traces
+* X-Action-Secret used as authentication header field for edge functions
 
 Frontend Security
 

@@ -670,3 +670,24 @@ Consequences:
 * Future chats should load these docs before making changes.
 * New design decisions should be added to DecisionLog.md.
 * Interface or semantics changes should update the relevant document.
+* 
+Use X-Action-Secret for Edge Function authentication instead of Authorization, because Supabase Dashboard and some clients may inject or override Authorization with a Supabase JWT.
+
+## 2026-06-01 — Use X-Action-Secret for Edge Function Auth
+
+Status: accepted
+
+Decision:
+
+Use `X-Action-Secret` for GPT/Admin-to-Edge-Function authentication instead of relying on the `Authorization` header.
+
+Reason:
+
+Supabase Dashboard and some clients may inject or override the `Authorization` header with a Supabase JWT. During testing, the function received a JWT instead of the custom action secret, causing 401 responses. A dedicated `X-Action-Secret` header avoids this ambiguity.
+
+Consequences:
+
+- Edge Functions should check `X-Action-Secret`.
+- `Authorization: Bearer ...` may be supported as fallback, but should not be the primary documented path.
+- Interfaces.md examples should use `X-Action-Secret`.
+- Custom GPT actions should send `X-Action-Secret`.
