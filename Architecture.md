@@ -139,6 +139,19 @@ Specialized tables may be added later if real usage proves they are needed.
 
 ⸻
 
+6. Scalability
+
+All read operations must support:
+
+- limit
+- offset
+
+Even if the initial dataset is small.
+
+This avoids future interface changes as historical data grows.
+
+⸻
+
 High-Level Architecture
 
 ChatGPT Coach
@@ -366,6 +379,14 @@ Purpose:
 
 Stores coaching analysis, interpretation, and recommendations.
 
+Coach observations are not automatically created during add_log_entry.
+
+Logging and coaching are intentionally separated.
+
+The system should not create large numbers of AI-generated records during normal logging.
+
+Coach observations may be created later by dedicated analysis workflows.
+
 This table is not factual user data.
 
 Rules:
@@ -521,13 +542,25 @@ The user should not need to choose whether something is a meal, workout, recover
 
 The GPT should accept a conversational log, preserve the raw text, and extract one or more fitness_events.
 
-Recommended v0.1 actions:
 
-add_log_entry
-get_logs
-get_day_summary
-get_trends
-update_event
+# v0.1 Action Set
+
+WRITE
+
+- add_log_entry
+- update_event
+
+READ
+
+- get_logs
+- search_events
+- get_day_summary
+
+ANALYSIS SUPPORT
+
+- get_trends
+
+These actions are considered the stable v0.1 interface contract.
 
 Avoid exposing separate actions such as:
 
@@ -641,3 +674,44 @@ Pending:
 * Admin UI design
 * Trend analysis model
 * Data retention strategy
+
+# Logging Model
+
+The system uses automatic conversational logging.
+
+The user is not expected to explicitly choose between:
+
+- meal
+- workout
+- weigh_in
+- recovery
+- sleep
+
+Instead, the GPT determines whether fitness-relevant information should be logged.
+
+Examples:
+
+User:
+“198.0 today.”
+
+GPT:
+Creates a log entry and weigh_in fitness event.
+
+User:
+“Morning.”
+
+GPT:
+No logging action required.
+
+The primary goal is minimizing user logging friction.
+
+# Event Identity
+
+fitness_event IDs are durable.
+
+Events may be updated through update_event.
+
+Event IDs should not change during the lifetime of a record.
+
+Future versions may add revision history, but v0.1 stores only the current version of each event.
+
