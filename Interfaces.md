@@ -1319,3 +1319,101 @@ Admin UI
 The Admin UI should use the same interfaces where practical.
 
 This keeps behavior consistent between GPT and web-based review/editing.
+
+# GPT Actions v0.1.1
+
+Interface Version
+
+Interface Version: v0.1.1
+
+v0.1.1 is a compatibility patch to the GPT Actions OpenAPI schema.
+
+The deployed backend action contracts remain v0.1.
+
+The Custom GPT action schema is v0.1.1.
+
+⸻
+
+Working Action Set
+
+The following actions have been deployed, configured in the Custom GPT, and tested successfully:
+
+addLogEntry
+getLogs
+searchEvents
+updateEvent
+
+Corresponding Supabase Edge Function endpoints:
+
+/add-log-entry
+/get-logs
+/search-events
+/update-event
+
+⸻
+
+Authentication Header
+
+GPT Actions and test clients should authenticate using:
+
+X-Action-Secret: <ACTION_API_SECRET>
+
+Do not rely on the Authorization header as the primary action secret transport.
+
+Reason:
+
+Supabase Dashboard and some clients may inject or override Authorization with a Supabase JWT.
+
+The Edge Functions may support Authorization: Bearer <secret> as fallback, but the documented and preferred interface is:
+
+X-Action-Secret
+
+⸻
+
+OpenAPI Schema Patch v0.1.1
+
+The GPT Actions validator requires object schemas to include a properties field.
+
+The flexible JSON object schema used for:
+
+facts
+estimates
+interpretations
+details
+data
+
+was patched from:
+
+{
+  “type”: “object”,
+  “additionalProperties”: true
+}
+
+to:
+
+{
+  “type”: “object”,
+  “properties”: {},
+  “additionalProperties”: true
+}
+
+This preserves flexible JSONB behavior while satisfying the GPT Actions schema validator.
+
+⸻
+
+Milestone 1 Result
+
+Milestone 1 — GPT Action MVP is complete.
+
+Verified behavior:
+
+addLogEntry creates log_entries and child fitness_events.
+getLogs retrieves raw logs and extracted events by date.
+searchEvents finds events by query, type, review flag, and date.
+updateEvent corrects structured events without modifying raw_text.
+
+Important confirmed behavior:
+
+Raw text remains unchanged during corrections.
+fitness_event IDs are durable.
+Structured extraction is correctable.

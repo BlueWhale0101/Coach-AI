@@ -691,3 +691,112 @@ Consequences:
 - `Authorization: Bearer ...` may be supported as fallback, but should not be the primary documented path.
 - Interfaces.md examples should use `X-Action-Secret`.
 - Custom GPT actions should send `X-Action-Secret`.
+- 
+  DecisionLog.md Patch — Milestone 1 Decisions
+
+2026-06-01 — Use X-Action-Secret for Edge Function Authentication
+
+Status: accepted
+
+Decision:
+
+Use X-Action-Secret for GPT/Admin-to-Edge-Function authentication instead of relying on the Authorization header.
+
+Reason:
+
+During Dashboard testing, Supabase injected or forwarded an Authorization header containing a Supabase JWT. The function received a value beginning with eyJ... instead of the custom action secret, causing 401 responses.
+
+Using a dedicated X-Action-Secret header avoids ambiguity and keeps the action secret independent from Supabase JWT behavior.
+
+Consequences:
+
+* Edge Functions should check X-Action-Secret.
+* GPT Actions should send X-Action-Secret.
+* Documentation examples should use X-Action-Secret.
+* Authorization: Bearer <secret> may be supported as fallback, but it is not the primary documented path.
+
+Related docs:
+
+* Interfaces.md
+* Edge Function source files
+
+⸻
+
+2026-06-01 — Patch OpenAPI Schema to v0.1.1 for GPT Actions Compatibility
+
+Status: accepted
+
+Decision:
+
+Patch the Custom GPT OpenAPI schema from v0.1.0 to v0.1.1 by adding explicit empty properties: {} blocks to flexible object schemas.
+
+Reason:
+
+The GPT Actions editor rejected the original schema with:
+
+In context=(‘components’, ‘schemas’, ‘JsonObject’), object schema missing properties
+
+The original schema was valid OpenAPI-style flexible object modeling, but GPT Actions validation was stricter.
+
+Consequences:
+
+* facts, estimates, and interpretations remain flexible JSON objects.
+* The schema satisfies the GPT Actions validator.
+* Backend behavior is unchanged.
+* Interface schema version is now v0.1.1.
+
+Related docs:
+
+* Interfaces.md
+* Custom GPT OpenAPI schema
+
+⸻
+
+2026-06-01 — Milestone 1 GPT Action MVP Complete
+
+Status: accepted
+
+Decision:
+
+Declare Milestone 1 complete.
+
+Completed components:
+
+* Supabase schema deployed
+* add-log-entry deployed and tested
+* get-logs deployed and tested
+* search-events deployed and tested
+* update-event deployed and tested
+* Custom GPT OpenAPI schema configured
+* GPT Actions tests passed
+
+Reason:
+
+The system now supports the essential end-to-end loop:
+
+Custom GPT
+  -> Edge Functions
+  -> PostgreSQL
+  -> retrieve/search/update records
+
+The core design principles have been validated in the deployed system:
+
+* Raw text is preserved.
+* Structured child events are created.
+* Events can be retrieved.
+* Events can be searched.
+* Structured extraction can be corrected without modifying raw text.
+
+Consequences:
+
+* Project can move from GPT Action MVP to next implementation phase.
+* Next recommended backend functions are get-day-summary and get-trends.
+* Minimal admin/debug UI can begin after core backend read/write workflows are stable.
+* Documentation package should be refreshed and re-uploaded as project source.
+
+Related docs:
+
+* README.md
+* Interfaces.md
+* Architecture.md
+* DataSemantics.md

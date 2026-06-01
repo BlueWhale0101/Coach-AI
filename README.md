@@ -308,27 +308,4 @@ The user experience should always favor fast conversational logging over perfect
 
 ⸻
 
-Current Status
-
-Version: v0.2
-
-Completed:
-
-* Architecture design
-* Data model design
-* Core principles
-* Flexible event architecture
-
-In Progress:
-
-* GPT Action contracts
-* Import workflows
-* Edge Functions
-* Admin UI
-
-Planned:
-
-* Trend analysis engine
-* Automated coaching workflows
-* Historical chat backfill
-* Weight log image imports
+Find entries mentioning HYROX.
