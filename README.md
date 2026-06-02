@@ -309,3 +309,49 @@ The user experience should always favor fast conversational logging over perfect
 ⸻
 
 Find entries mentioning HYROX.
+
+README.md Patch — Admin App Status
+
+Current Status
+
+Version: v0.1.2
+
+Milestone 1 — GPT Action MVP: complete.
+
+Milestone 2 — Admin/debug visibility: complete.
+
+Completed:
+
+* Supabase schema deployed
+* add-log-entry Edge Function deployed and tested
+* get-logs Edge Function deployed and tested
+* search-events Edge Function deployed and tested
+* update-event Edge Function deployed and tested
+* get-day-summary Edge Function deployed and tested
+* Custom GPT OpenAPI action schema created
+* Custom GPT action schema patched to v0.1.1 for GPT Actions validator compatibility
+* Custom GPT action tests passed
+* Lightweight GitHub Pages admin/debug app created and deployed
+* Admin app patched to v0.1.2 for mobile/Safari layout containment
+
+Working admin app capabilities:
+
+* View logs by date
+* Filter logs by event type
+* Search events
+* View needs-review records
+* Generate/read day summaries
+* Update structured events
+* Copy log, event, and summary JSON for debugging
+
+The admin app is intentionally a lightweight inspection/debug tool, not the primary user experience.
+
+The primary user experience remains conversational logging through the Custom GPT.
+
+Next planned work:
+
+* get-trends
+* Update GPT action schema after get-trends
+* Test trend-oriented coach prompts
+* Continue improving coach tone with sample responses from the long-running coaching chat
+* Historical import workflow

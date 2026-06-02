@@ -800,3 +800,37 @@ Related docs:
 * Interfaces.md
 * Architecture.md
 * DataSemantics.md
+* 
+ ## 2026-06-02 — get-trends Generates Missing Daily Summaries On Demand
+
+Status: accepted
+
+Decision:
+
+For v0.1, `get-trends` may generate or refresh missing `daily_summaries` for dates in the requested range when the requested metric depends on daily summaries.
+
+This applies especially to:
+
+- calories
+- protein
+- training_load
+- daily workout counts
+
+Reason:
+
+Nutrition and training trends should not appear empty simply because the user or admin has not manually run `get-day-summary` for every date.
+
+The GPT should be able to ask for a protein or calorie trend over a date range and receive usable data without requiring manual summary generation first.
+
+Consequences:
+
+- `daily_summaries` remain derived/regeneratable data.
+- `get-trends` can perform light summary maintenance as part of trend retrieval.
+- Trend results may update `daily_summaries.updated_at`.
+- The function should still return raw trend points, not coaching interpretation.
+- GPT remains responsible for interpreting the trend.
+
+Related docs:
+
+- `Interfaces.md`
+- `Architecture.md`

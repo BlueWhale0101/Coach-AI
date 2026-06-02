@@ -1417,3 +1417,11 @@ Important confirmed behavior:
 Raw text remains unchanged during corrections.
 fitness_event IDs are durable.
 Structured extraction is correctable.
+
+## get_trends Summary Generation Behavior
+
+For metrics that depend on `daily_summaries`, `get-trends` may generate or refresh missing daily summaries within the requested date range.
+
+This behavior is allowed for v0.1 so that calorie, protein, workout-count, and training-load trends work even when summaries have not been manually generated.
+
+The action still returns structured trend data only. It does not provide final coaching interpretation.
