@@ -507,3 +507,11 @@ code {
   border-radius: 6px;
   padding: .05rem .25rem;
 }
+
+
+/* v0.3 bulk review status */
+.bulk-review-note {
+  color: var(--muted);
+  font-size: .9rem;
+  margin-top: .5rem;
+}

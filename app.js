@@ -10,6 +10,9 @@ const EVENT_TYPES = [
   "symptom",
 ];
 
+let lastSearchResults = [];
+
+
 const $ = (id) => document.getElementById(id);
 
 function todayIso() {
@@ -200,15 +203,25 @@ function renderLogs(logs) {
 }
 
 function renderSearchResults(results) {
+  lastSearchResults = Array.isArray(results) ? results : [];
+  const markBtn = $("markSearchReviewedBtn");
+  if (markBtn) markBtn.disabled = lastSearchResults.length === 0;
+
   const container = $("searchResults");
   container.innerHTML = "";
 
-  if (!results.length) {
+  if (!lastSearchResults.length) {
     container.innerHTML = `<div class="panel">No events found.</div>`;
     return;
   }
 
-  results.forEach((event) => container.appendChild(renderEvent(event)));
+  const reviewCount = lastSearchResults.filter((event) => event.needs_review === true).length;
+  const note = document.createElement("div");
+  note.className = "panel";
+  note.innerHTML = `<strong>${lastSearchResults.length}</strong> displayed event(s). <strong>${reviewCount}</strong> need review. Use “Mark displayed reviewed” only after you have inspected the visible result set.`;
+  container.appendChild(note);
+
+  lastSearchResults.forEach((event) => container.appendChild(renderEvent(event)));
 }
 
 function metric(label, value) {
@@ -387,6 +400,51 @@ function setupDefaults() {
   $("summaryDate").value = today;
 }
 
+
+
+async function markDisplayedSearchResultsReviewed() {
+  const eventsToReview = lastSearchResults.filter((event) => event.needs_review === true);
+  if (!eventsToReview.length) {
+    setStatus("searchStatus", "No displayed events need review.", "warn");
+    return;
+  }
+
+  const ok = window.confirm(`Mark ${eventsToReview.length} displayed event(s) as reviewed?`);
+  if (!ok) return;
+
+  setStatus("searchStatus", `Marking 0/${eventsToReview.length} reviewed...`);
+
+  for (let i = 0; i < eventsToReview.length; i++) {
+    const event = eventsToReview[i];
+    const eventId = event.event_id || event.id;
+    if (!eventId) {
+      setStatus("searchStatus", `Stopped: displayed event #${i + 1} has no event ID.`, "err");
+      return;
+    }
+
+    try {
+      await callFunction("update-event", {
+        event_id: eventId,
+        changes: {
+          needs_review: false
+        },
+        change_reason: "Marked reviewed from admin bulk review."
+      });
+      event.needs_review = false;
+      setStatus("searchStatus", `Marking ${i + 1}/${eventsToReview.length} reviewed...`, "ok");
+    } catch (err) {
+      setStatus("searchStatus", `Stopped at ${i + 1}/${eventsToReview.length}: ${err.message}`, "err");
+      renderSearchResults(lastSearchResults);
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 75));
+  }
+
+  renderSearchResults(lastSearchResults);
+  setStatus("searchStatus", `Marked ${eventsToReview.length} displayed event(s) reviewed.`, "ok");
+}
+
 function setupEvents() {
   $("saveSettingsBtn").addEventListener("click", saveSettings);
   $("clearSettingsBtn").addEventListener("click", clearSettings);
@@ -404,6 +462,7 @@ function setupEvents() {
     $("searchNeedsReview").value = "true";
     searchEvents();
   });
+  $("markSearchReviewedBtn").addEventListener("click", markDisplayedSearchResultsReviewed);
   $("summaryBtn").addEventListener("click", loadSummary);
   $("quickField").addEventListener("change", applyQuickField);
   $("formatJsonBtn").addEventListener("click", () => {
