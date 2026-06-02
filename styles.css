@@ -406,3 +406,69 @@ p {
     width: calc(100vw - 1rem);
   }
 }
+
+
+
+/* v0.1.2 iOS/Safari form containment patch */
+.grid,
+.grid > *,
+label,
+label > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+input,
+select,
+textarea {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+
+/* iOS date inputs can keep an intrinsic width that overflows CSS grid cells.
+   Force them to behave like normal boxed controls. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="number"],
+input[type="url"],
+input[type="password"],
+input[type="search"],
+input[type="text"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Keep native select styling but prevent select controls from pushing layout wide. */
+select {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* On narrow screens, force all input rows to single-column even if browser
+   calculates grid intrinsic sizes oddly. */
+@media (max-width: 820px) {
+  .grid,
+  .grid.two,
+  .grid.four {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  label {
+    width: 100%;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+  }
+}
