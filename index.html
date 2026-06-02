@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Coach AI Admin</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Coach AI Admin</h1>
+      <p class="subtitle">Lightweight debug console for logs, events, summaries, and corrections.</p>
+    </div>
+    <div class="version">v0.1</div>
+  </header>
+
+  <main>
+    <section class="panel settings-panel">
+      <h2>Connection</h2>
+      <div class="grid two">
+        <label>
+          Function Base URL
+          <input id="baseUrl" type="url" placeholder="https://PROJECT_REF.supabase.co/functions/v1" />
+        </label>
+        <label>
+          X-Action-Secret
+          <input id="actionSecret" type="password" placeholder="ACTION_API_SECRET" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="saveSettingsBtn">Save settings locally</button>
+        <button id="clearSettingsBtn" class="secondary">Clear</button>
+        <span id="settingsStatus" class="status"></span>
+      </div>
+      <p class="hint">
+        This is a debug/admin tool. The secret is stored in this browser's localStorage if you save settings.
+        Do not deploy it with a hardcoded secret.
+      </p>
+    </section>
+
+    <nav class="tabs" aria-label="Admin views">
+      <button class="tab active" data-tab="logs">Logs</button>
+      <button class="tab" data-tab="search">Search</button>
+      <button class="tab" data-tab="summary">Day Summary</button>
+      <button class="tab" data-tab="edit">Edit Event</button>
+    </nav>
+
+    <section id="logs" class="tab-panel active">
+      <div class="panel">
+        <h2>Logs by Date</h2>
+        <div class="grid four">
+          <label>
+            Start Date
+            <input id="logsStartDate" type="date" />
+          </label>
+          <label>
+            End Date
+            <input id="logsEndDate" type="date" />
+          </label>
+          <label>
+            Event Type
+            <select id="logsEventType">
+              <option value="">Any</option>
+            </select>
+          </label>
+          <label>
+            Limit
+            <input id="logsLimit" type="number" min="1" max="500" value="100" />
+          </label>
+        </div>
+        <div class="row">
+          <button id="loadLogsBtn">Load logs</button>
+          <button id="loadTodayBtn" class="secondary">Today</button>
+          <span id="logsStatus" class="status"></span>
+        </div>
+      </div>
+      <div id="logsResults" class="results"></div>
+    </section>
+
+    <section id="search" class="tab-panel">
+      <div class="panel">
+        <h2>Search Events</h2>
+        <div class="grid four">
+          <label>
+            Query
+            <input id="searchQuery" type="search" placeholder="HYROX, eggs, low energy..." />
+          </label>
+          <label>
+            Event Type
+            <select id="searchEventType">
+              <option value="">Any</option>
+            </select>
+          </label>
+          <label>
+            Needs Review
+            <select id="searchNeedsReview">
+              <option value="">Any</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <label>
+            Limit
+            <input id="searchLimit" type="number" min="1" max="500" value="50" />
+          </label>
+        </div>
+        <div class="grid two">
+          <label>
+            Start Date
+            <input id="searchStartDate" type="date" />
+          </label>
+          <label>
+            End Date
+            <input id="searchEndDate" type="date" />
+          </label>
+        </div>
+        <div class="row">
+          <button id="searchBtn">Search</button>
+          <button id="needsReviewBtn" class="secondary">Needs Review</button>
+          <span id="searchStatus" class="status"></span>
+        </div>
+      </div>
+      <div id="searchResults" class="results"></div>
+    </section>
+
+    <section id="summary" class="tab-panel">
+      <div class="panel">
+        <h2>Day Summary</h2>
+        <div class="grid two">
+          <label>
+            Date
+            <input id="summaryDate" type="date" />
+          </label>
+          <label>
+            Generate / Upsert
+            <select id="summaryGenerate">
+              <option value="true">Generate if missing / refresh</option>
+              <option value="false">Read existing only</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <button id="summaryBtn">Load summary</button>
+          <span id="summaryStatus" class="status"></span>
+        </div>
+      </div>
+      <div id="summaryResults" class="results"></div>
+    </section>
+
+    <section id="edit" class="tab-panel">
+      <div class="panel">
+        <h2>Edit Event</h2>
+        <p class="hint">Paste an event ID, choose a quick correction, or edit raw JSON changes. This updates structured events only. Raw log text is not changed.</p>
+        <label>
+          Event ID
+          <input id="editEventId" type="text" placeholder="uuid" />
+        </label>
+        <div class="grid two">
+          <label>
+            Quick Field
+            <select id="quickField">
+              <option value="">Custom JSON</option>
+              <option value="needs_review_false">Mark reviewed</option>
+              <option value="needs_review_true">Mark needs review</option>
+              <option value="meal_breakfast">Meal label: breakfast</option>
+              <option value="meal_lunch">Meal label: lunch</option>
+              <option value="meal_dinner">Meal label: dinner</option>
+            </select>
+          </label>
+          <label>
+            Change Reason
+            <input id="changeReason" type="text" placeholder="Optional reason" />
+          </label>
+        </div>
+        <label>
+          Changes JSON
+          <textarea id="changesJson" rows="10" spellcheck="false">{
+  "needs_review": false
+}</textarea>
+        </label>
+        <div class="row">
+          <button id="updateEventBtn">Update event</button>
+          <button id="formatJsonBtn" class="secondary">Format JSON</button>
+          <span id="editStatus" class="status"></span>
+        </div>
+      </div>
+      <div id="editResults" class="results"></div>
+    </section>
+  </main>
+
+  <template id="eventTemplate">
+    <article class="event-card">
+      <div class="card-header">
+        <div>
+          <span class="pill event-type"></span>
+          <strong class="event-title"></strong>
+        </div>
+        <button class="copy-event secondary small">Copy JSON</button>
+      </div>
+      <p class="event-description"></p>
+      <dl class="meta-list"></dl>
+      <details>
+        <summary>JSON</summary>
+        <pre class="json-block"></pre>
+      </details>
+    </article>
+  </template>
+
+  <script src="./app.js"></script>
+</body>
+</html>
