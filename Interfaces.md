@@ -1425,3 +1425,129 @@ For metrics that depend on `daily_summaries`, `get-trends` may generate or refre
 This behavior is allowed for v0.1 so that calorie, protein, workout-count, and training-load trends work even when summaries have not been manually generated.
 
 The action still returns structured trend data only. It does not provide final coaching interpretation.
+
+Interfaces.md Patch — v0.2 Action Set
+
+Interface Version
+
+Interface Version: v0.2.0
+
+v0.2.0 adds summary and trend retrieval actions to the working GPT Action set.
+
+The active Custom GPT action schema is:
+
+coach-ai-actions-openapi-v0.2.json
+
+⸻
+
+Working Action Set
+
+The following actions have been deployed, configured in the Custom GPT, and tested successfully:
+
+addLogEntry
+getLogs
+searchEvents
+updateEvent
+getDaySummary
+getTrends
+
+Corresponding Supabase Edge Function endpoints:
+
+/add-log-entry
+/get-logs
+/search-events
+/update-event
+/get-day-summary
+/get-trends
+
+⸻
+
+getDaySummary Status
+
+getDaySummary is deployed and tested.
+
+Purpose:
+
+Retrieve or generate a mechanical daily summary for one date.
+
+Confirmed behavior:
+
+* reads fitness_events
+* aggregates bodyweight, calorie range, protein range, workouts, training load, recovery, sleep, flags, and source IDs
+* upserts into daily_summaries
+* keeps coach_summary null
+* returns structured summary data for GPT interpretation
+
+Important constraint:
+
+getDaySummary is not a coaching engine.
+
+It provides mechanical summary data.
+
+The GPT provides conversational interpretation.
+
+⸻
+
+getTrends Status
+
+getTrends is deployed and tested.
+
+Purpose:
+
+Retrieve trend-ready data points for GPT analysis.
+
+Supported metrics:
+
+bodyweight
+calories
+protein
+workouts
+training_load
+recovery
+sleep
+hunger
+energy
+
+Supported buckets:
+
+day
+week
+
+Confirmed behavior:
+
+* bodyweight trend reads directly from weigh_in events
+* protein/calorie/workout/training-load trends use daily_summaries
+* summary-backed metrics generate or refresh missing daily summaries on demand
+* returns raw trend points, not coaching interpretation
+* includes pagination metadata
+* includes source metadata
+
+Important constraint:
+
+getTrends does not decide whether progress is good or bad.
+
+It returns data.
+
+The GPT performs the analysis.
+
+⸻
+
+getTrends Summary Generation Behavior
+
+For metrics that depend on daily_summaries, getTrends may generate or refresh missing daily summaries within the requested date range.
+
+This behavior is allowed for v0.2 so that calorie, protein, workout-count, and training-load trends work even when summaries have not been manually generated.
+
+This applies to:
+
+calories
+protein
+workouts
+training_load
+
+Consequences:
+
+* daily_summaries remain derived/regeneratable data
+* trend calls may update daily_summaries.updated_at
+* trend calls may create missing daily summary rows
+* GPT should still treat summaries as derived, not source of truth

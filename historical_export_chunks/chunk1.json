@@ -1,0 +1,486 @@
+{
+"chunk_number": 1,
+"messages": [
+{
+"approx_date": "2026-05-01",
+"raw_user_text": "I’ve had a whole abe low carb bagel with 2 slices smoked salmon and a small squirt of olive oil.\n\nIve been on my feet for yard work and moving boxes all day, and had a 10k lined up for tonight. It might be a good day for pizza or dumplings.",
+"candidate_categories": [
+"meal",
+"activity",
+"planned_workout",
+"social_food_context"
+],
+"notes": "Early accessible log; mentions meal, yard work/moving boxes, planned 10k, possible pizza/dumplings."
+},
+{
+"approx_date": "2026-05-01",
+"raw_user_text": "12k run, which felt good but long! I am also opting for dumplings tonight from Confucius dumplings",
+"candidate_categories": [
+"workout",
+"meal_plan",
+"social_food_context"
+],
+"notes": "Run completed; dinner plan."
+},
+{
+"approx_date": "2026-05-01",
+"raw_user_text": "I wouldn’t be surprised if it’s a 4000 calorie output day, or close. That run was 100 minutes. The CrossFit workout was a rough one. 800m warm up, then run a mile, then 100 box burpees and 200 overhead squats in partners at 45 kg. Then walk 30-40 minutes for the golf course walk then 3 hours of yardwork and helping move. That was quite a day!",
+"candidate_categories": [
+"workout",
+"activity",
+"training_load",
+"recovery_context"
+],
+"notes": "High-output day with long run, CrossFit, walking, yardwork, moving."
+},
+{
+"approx_date": "2026-05-01",
+"raw_user_text": "Good. Also, tomorrow I’m going to a music festival, so we will need to strategize. I will want a bit of junk food and a beer!",
+"candidate_categories": [
+"social_food_context",
+"alcohol",
+"meal_plan"
+],
+"notes": "Planned festival with junk food and beer."
+},
+{
+"approx_date": "2026-05-01",
+"raw_user_text": "Dinner was weird. I ate 7 dumplings and then suddenly felt nauseous. Probably from the long run, I suppose.",
+"candidate_categories": [
+"meal",
+"symptom",
+"recovery"
+],
+"notes": "Dinner plus nausea after high-output day."
+},
+{
+"approx_date": "2026-05-02",
+"raw_user_text": "Hey, weighed in at 199.8 this morning!",
+"candidate_categories": [
+"weigh_in"
+],
+"notes": "Morning bodyweight."
+},
+{
+"approx_date": "2026-05-02",
+"raw_user_text": "Next milestone 195!\nBrekky: 300-350g turkey mince and scrambled eggs combined, with salsa.\n\nOff to festival.",
+"candidate_categories": [
+"goal",
+"meal",
+"social_food_context"
+],
+"notes": "Breakfast and milestone goal."
+},
+{
+"approx_date": "2026-05-02",
+"raw_user_text": "Festival so far. 1 hot toddy, 1 Dagwood dog and like 3 chicken nuggets.",
+"candidate_categories": [
+"meal",
+"alcohol",
+"social_food_context"
+],
+"notes": "Festival food/drink log."
+},
+{
+"approx_date": "2026-05-02",
+"raw_user_text": "Festival food. 2 hot toddy, 1 Dagwood dog and like 3 chicken nuggets. Dinner was a Japanese chicken katsu with curry on about 100g of rice and a little veg",
+"candidate_categories": [
+"meal",
+"alcohol",
+"social_food_context"
+],
+"notes": "Fuller festival food log; likely supersedes previous partial festival update."
+},
+{
+"approx_date": "2026-05-03",
+"raw_user_text": "Another solid hyrox session \nBrekky 2 eggs, 2 slices of salmon and a crumpet. \nLunch double protein shake and half a peanut butter and honey. \nSnack mussashi protein bar, and a bit of white chocolate. \nDinner 250g turkey mince, low carb wrap, salsa",
+"candidate_categories": [
+"workout",
+"meal"
+],
+"notes": "HYROX session plus full-day food log."
+},
+{
+"approx_date": "2026-05-03",
+"raw_user_text": "I also had a pear and worked on building a shed for six hours",
+"candidate_categories": [
+"meal",
+"activity"
+],
+"notes": "Additional snack and heavy activity."
+},
+{
+"approx_date": "2026-05-03",
+"raw_user_text": "I’m probably going to have popcorn and another protein shake tonight, and pickles. I’m starving and exhausted. It’s a day off from the gym tomorrow.",
+"candidate_categories": [
+"meal_plan",
+"hunger",
+"recovery",
+"planned_rest"
+],
+"notes": "Evening hunger/fatigue and planned snack/rest day."
+},
+{
+"approx_date": "2026-05-04",
+"raw_user_text": "New day! Hyrox this morning. Brekky 3 eggs, slice of turkey breast, mushrooms and croissant. \nLunch: chicken leg and thigh, jerk style. Green beans. 125g steak. \nSnack small amount of beef jerky.",
+"candidate_categories": [
+"workout",
+"meal"
+],
+"notes": "New day marker; HYROX and meals."
+},
+{
+"approx_date": "2026-05-04",
+"raw_user_text": "I was thinking a low carb wrap with an 80g chunk of salmon and then 2 slices of smoked salmon. Should I add a protein shake?",
+"candidate_categories": [
+"meal_plan"
+],
+"notes": "Dinner/snack planning."
+},
+{
+"approx_date": "2026-05-04",
+"raw_user_text": "Worked outside for two and a half hours, then ate 150g salmon + 2 slices smoked salmon on a low carb tortilla. Finished with some pickles.",
+"candidate_categories": [
+"activity",
+"meal"
+],
+"notes": "Outdoor work and meal."
+},
+{
+"approx_date": "2026-05-05",
+"raw_user_text": "Weighed in at 199.3 today, so progress is continuing. It seems a bit slow this week…\n\nCrossFit workout\nBrekky: 50g of beef jerky\nLunch: cinco de mayo celebration. 10 tortilla chips with a bit of guacamole and salsa. 1 taco with pulled pork. 50g spare rib, 50g chicken breast, 1 cup tortilla soup, 1/2 cup horchata, 1 small empanada. Bit of veg. \nSnack 50g beef jerky",
+"candidate_categories": [
+"weigh_in",
+"workout",
+"meal",
+"social_food_context"
+],
+"notes": "Weight, CrossFit, celebration food."
+},
+{
+"approx_date": "2026-05-05",
+"raw_user_text": "Great! I do think my training volume is a bit up with hyrox prep. I went from 5-6 CrossFit sessions a week to 2 hyrox, 3 CrossFit and 1-2 runs.",
+"candidate_categories": [
+"training_context",
+"workout"
+],
+"notes": "Training schedule context."
+},
+{
+"approx_date": "2026-05-05",
+"raw_user_text": "That sounds awesome! Dinner was 250g lean hamburger meat, half cup of corn and some pickles",
+"candidate_categories": [
+"meal"
+],
+"notes": "Dinner log."
+},
+{
+"approx_date": "2026-05-06",
+"raw_user_text": "Brekky: 1 biscuit with gravy and 2 eggs. \nLunch: 125g steak, 85g chicken, about a fist size of watermelon and kiwi. No snacks.",
+"candidate_categories": [
+"meal"
+],
+"notes": "Breakfast/lunch log."
+},
+{
+"approx_date": "2026-05-06",
+"raw_user_text": "I’m thinking 100g lean hamburger meat, 2 slices smoked salmon, pickles for dinner. Then a shake and popcorn later.",
+"candidate_categories": [
+"meal_plan"
+],
+"notes": "Planned dinner and evening snack."
+},
+{
+"approx_date": "2026-05-06",
+"raw_user_text": "Great. Today was a rest day and tomorrow is a hard training day.",
+"candidate_categories": [
+"recovery",
+"planned_workout"
+],
+"notes": "Rest day and next-day training context."
+},
+{
+"approx_date": "2026-05-06",
+"raw_user_text": "I was hungry. So i had the dinner I said, but three slices of salmon",
+"candidate_categories": [
+"meal",
+"hunger"
+],
+"notes": "Dinner consumed with extra salmon."
+},
+{
+"approx_date": "2026-05-06",
+"raw_user_text": "I also ended up having the popcorn (half bag) and the protein shake! I’m feeling ready for tomorrow. Hopefully it’s still a deficit day also",
+"candidate_categories": [
+"meal",
+"recovery"
+],
+"notes": "Evening snack update."
+},
+{
+"approx_date": "2026-05-07",
+"raw_user_text": "Man, the scale has not moved much in the last 7 days. Is that expected?",
+"candidate_categories": [
+"weigh_in",
+"coaching_context"
+],
+"notes": "Accompanied by image of handwritten weight log in conversation."
+},
+{
+"approx_date": "2026-05-07",
+"raw_user_text": "First, daily check in. Then I want to talk about expectations and what I can expect to see over the next few weeks. \n\nHard CrossFit this morning\nBrekky: 1/2 English muffin, some strawberries, 4 eggs, heap of mushrooms\nLunch: Palm size amount of orange chicken, 1 crumbed fillet barramundi (1.5 palms) and 1.5 cups veggies",
+"candidate_categories": [
+"workout",
+"meal",
+"coaching_context"
+],
+"notes": "Daily check-in with hard CrossFit and meals."
+},
+{
+"approx_date": "2026-05-07",
+"raw_user_text": "Is my running load in a good place? I’ve been doing 2 hyrox workouts a week (running under fatigue, shorter runs with stations), one short run (5k, maybe zone 3 or 4) and one long zone 2 (10-12k)",
+"candidate_categories": [
+"training_context",
+"workout",
+"coaching_context"
+],
+"notes": "Running load summary."
+},
+{
+"approx_date": "2026-05-09",
+"raw_user_text": "Ok, really chaotic evening. There is an unexpected party being hosted at my house tomorrow morning. We should make a plan. It’s a Mother’s Day brunch, so mimosas and quiche and croissants and fruit are on the menu. I can avoid all of it if I need to. \n\nDinner: Abe low carb bagel and three slices of smoked salmon. Still hungry later so two chicken nuggets, 10g cheese and 1 more slice of salmon ",
+"candidate_categories": [
+"meal",
+"hunger",
+"social_food_context",
+"alcohol_plan"
+],
+"notes": "Dinner plus planned brunch context."
+},
+{
+"approx_date": "2026-05-09",
+"raw_user_text": "Got it. The thing is I’m not a mom, it’s my wife’s event and she kind of got pushed into hosting it. It wasn’t even supposed to be here! So tomorrow is going to be a bit stressful. 😣 I think it will be quite small, so that’s good. It’s just 2 hours. ",
+"candidate_categories": [
+"social_context",
+"stress",
+"recovery"
+],
+"notes": "Stress context for upcoming brunch."
+},
+{
+"approx_date": "2026-05-09",
+"raw_user_text": "Got it. A separate question now. How are you estimating my maintenance calories? ",
+"candidate_categories": [
+"coaching_context",
+"nutrition_context"
+],
+"notes": "Question about maintenance/TDEE estimation."
+},
+{
+"approx_date": "2026-05-09",
+"raw_user_text": "Ok. Well, I’m hungry, and I’m having some popcorn too!",
+"candidate_categories": [
+"meal",
+"hunger"
+],
+"notes": "Additional snack."
+},
+{
+"approx_date": "2026-05-10",
+"raw_user_text": "What a morning. The brunch is done. \nBrekky: 1/3 Abe low carb bagel, 2 slices smoked salmon\nBrunch: 1 mimosa, 1 croissant and a few berries. \nLunch: starving. 10 scrambled eggs. \n",
+"candidate_categories": [
+"meal",
+"alcohol",
+"hunger",
+"social_food_context"
+],
+"notes": "Brunch event food plus hunger."
+},
+{
+"approx_date": "2026-05-10",
+"raw_user_text": "What a day. It got much better, but it was still stressful. I worked outside for 2 hours cleaning and doing some shop projects, then went for a 12k run. My watch said a 1000 calories! Anyways, I’m getting my wife and I dumplings for dinner. She had such a stressful day; we’re going to enjoy them on the couch with some tv",
+"candidate_categories": [
+"activity",
+"workout",
+"meal_plan",
+"stress",
+"social_food_context"
+],
+"notes": "Outdoor work, 12k run, dumpling plan."
+},
+{
+"approx_date": "2026-05-10",
+"raw_user_text": "It’s also another big hyrox day tomorrow!",
+"candidate_categories": [
+"planned_workout"
+],
+"notes": "Next-day workout plan."
+},
+{
+"approx_date": "2026-05-10",
+"raw_user_text": "I have a thought. The garmin watch doesn’t know that I’m pushing my son in his stroller. It’s very cool, I pack him a dinner and put a movie on a tablet and then run while pushing him wrapped up in a blanket for 1-2 hours. Everyone loves it! But it’s really noticeably harder. Zone 2 is like 10-11 minutes per mile like that. ",
+"candidate_categories": [
+"training_context",
+"workout",
+"family_context"
+],
+"notes": "Stroller run context; affects perceived effort/TDEE."
+},
+{
+"approx_date": "2026-05-10",
+"raw_user_text": "I did forget to mention I stole three of his gummy worms at the mid point of the run. A little candy goes a long way in these long runs! 😂",
+"candidate_categories": [
+"meal",
+"workout_fueling"
+],
+"notes": "Intra-run candy."
+},
+{
+"approx_date": "2026-05-10",
+"raw_user_text": "Just for record keeping: I had 9 boiled dumplings, 1 fried gyoza, and a cup of rice and sweet and sour fried pork. ",
+"candidate_categories": [
+"meal"
+],
+"notes": "Dinner record."
+},
+{
+"approx_date": "2026-05-10",
+"raw_user_text": "Just out of curiosity, let’s see if we can estimate the pork and rice better. It was a cup of rice and pork combined. Here is a picture. ",
+"candidate_categories": [
+"meal",
+"image_food_log"
+],
+"notes": "Image-based meal estimation request."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "I actually weighed in lower this morning! 199.7. That’s a nice morale boost. Solid hyrox this morning, about 40 minutes with no rest, and planning to take family out to breakfast for Mother’s Day. ",
+"candidate_categories": [
+"weigh_in",
+"workout",
+"meal_plan",
+"social_food_context"
+],
+"notes": "Weight, HYROX, breakfast outing plan."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "I’m a little concerned I’m not resting enough. I had one day off this week, and at 33 years old I really feel it. I’m still enjoying workouts, but I start thinking about rest days really hard. I think I run a sleep deficit pretty often and then catch up on off days. I don’t really track sleep formally. ",
+"candidate_categories": [
+"recovery",
+"sleep",
+"training_context",
+"coaching_context"
+],
+"notes": "Recovery concern and sleep deficit pattern."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "Ok, ended up making breakfast for the family! 80g salmon fillet, 3-4 scrambled eggs and a small croissant, and coffee with a splash of oat milk",
+"candidate_categories": [
+"meal",
+"social_food_context"
+],
+"notes": "Breakfast at home."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "Running entry for today, 1.5 serve protein shake and apple",
+"candidate_categories": [
+"meal",
+"workout_fueling"
+],
+"notes": "Snack or running-related entry."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "Ok, lots of parenting and a couple hours in the wood shop. Dinner was 110g salmon fillets (air fryer), a small bit of rice (I just didn’t like the packaged rice…) and 1 cup mixed peas and corn. Also 5 fried pickle chips (about the size of a us quarter). \n\nI’m STARVING still. I think more water, a protein shake, popcorn and pickles probably. But let’s look at the numbers and see if this is a reasonable hunger or if I’m out of sorts. ",
+"candidate_categories": [
+"activity",
+"meal",
+"hunger",
+"meal_plan",
+"recovery"
+],
+"notes": "Parenting/woodshop activity; dinner and hunger analysis request."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "Did you get two salmon fillets in there? So total 220g of salmon. ",
+"candidate_categories": [
+"meal_correction"
+],
+"notes": "Corrects dinner salmon amount."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "Ok. Good. Honestly, I’m a bit confused about those salmon serving sizes. They are frozen fillets with skin on, and it says they are 125g, and then I take the skin off. They do not look like 125g to me, they are about a palm size. What do you think?",
+"candidate_categories": [
+"meal_context",
+"portion_estimation"
+],
+"notes": "Portion estimation context."
+},
+{
+"approx_date": "2026-05-11",
+"raw_user_text": "Got it. Ok, I’m going to have the protein shake and I’ll decide on the popcorn later. ",
+"candidate_categories": [
+"meal_plan"
+],
+"notes": "Planned shake, maybe popcorn."
+},
+{
+"approx_date": "2026-05-12",
+"raw_user_text": "Brekky: 4 scrambled eggs and mushrooms\nSnack: 25g beef jerky\nLunch: two slices of turkey breast. About 1.5 palms each, and maybe 2-3mm thick. 1 cup Carrots and pumpkin, and 1 burger patty. ",
+"candidate_categories": [
+"meal"
+],
+"notes": "Breakfast, snack, lunch."
+},
+{
+"approx_date": "2026-05-12",
+"raw_user_text": "Great. I took a rest day, so I’m a bit less hungry. ",
+"candidate_categories": [
+"recovery",
+"hunger"
+],
+"notes": "Rest day and appetite note."
+},
+{
+"approx_date": "2026-05-12",
+"raw_user_text": "For dinner, a 150g porterhouse some mushrooms and a little Scotch has me excited. How’s that fit in. ",
+"candidate_categories": [
+"meal_plan",
+"alcohol"
+],
+"notes": "Dinner and alcohol plan."
+},
+{
+"approx_date": "2026-05-13",
+"raw_user_text": "Moderate hyrox workout today, with heavy back squats and a 20 minute circuit. Some of my team mates were talking and it got me thinking. I’m fairly muscular, but I kind of want a visible bicep vein! How does one get one?",
+"candidate_categories": [
+"workout",
+"body_composition_goal",
+"coaching_context"
+],
+"notes": "Moderate HYROX plus aesthetic/body composition goal."
+},
+{
+"approx_date": "2026-05-13",
+"raw_user_text": "Cool! I have visible forearm veins and a slightly visible chest and front felt veins. Low 190s is not too far away!",
+"candidate_categories": [
+"body_composition",
+"goal"
+],
+"notes": "Body composition observation; likely meant front delt veins."
+},
+{
+"approx_date": "2026-05-13",
+"raw_user_text": "Brekky: 1.5 fists of scrambled eggs (maybe 3 eggs?), slice of ham, 1 tsp guacamole, mushrooms. Banana. \n\nLunch: hamburger patty, 90g chicken breast, 1 cup fruit. ",
+"candidate_categories": [
+"meal"
+],
+"notes": "Breakfast and lunch."
+}
+]
+}

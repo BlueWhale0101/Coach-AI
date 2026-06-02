@@ -355,3 +355,70 @@ Next planned work:
 * Test trend-oriented coach prompts
 * Continue improving coach tone with sample responses from the long-running coaching chat
 * Historical import workflow
+* 
+ README.md Patch — Milestone 3 Complete
+
+Current Status
+
+Version: v0.2.0
+
+Milestone 1 — GPT Action MVP: complete.
+
+Milestone 2 — Admin/debug visibility: complete.
+
+Milestone 3 — Day summaries + trends: complete.
+
+Completed:
+
+* Supabase schema deployed
+* add-log-entry Edge Function deployed and tested
+* get-logs Edge Function deployed and tested
+* search-events Edge Function deployed and tested
+* update-event Edge Function deployed and tested
+* get-day-summary Edge Function deployed and tested
+* get-trends Edge Function deployed and tested
+* Custom GPT OpenAPI action schema created
+* Custom GPT action schema patched to v0.1.1 for GPT Actions validator compatibility
+* Custom GPT action schema updated to v0.2.0 with summary and trend actions
+* Custom GPT action tests passed
+* Lightweight GitHub Pages admin/debug app created and deployed
+* Admin app patched to v0.1.2 for mobile/Safari layout containment
+* GPT behavior instructions drafted and tested
+* Coach starter context drafted
+
+Working action set:
+
+addLogEntry
+getLogs
+searchEvents
+updateEvent
+getDaySummary
+getTrends
+
+Working admin app capabilities:
+
+* View logs by date
+* Filter logs by event type
+* Search events
+* View needs-review records
+* Generate/read day summaries
+* Update structured events
+* Copy log, event, and summary JSON for debugging
+
+The system now supports the core loop:
+
+Conversational coaching
+  -> automatic structured logging
+  -> raw text preservation
+  -> admin inspection
+  -> corrections
+  -> day summaries
+  -> trend retrieval
+
+Next planned work:
+
+* Historical import workflow
+* Import batch tooling
+* Backfill from long-running ChatGPT fitness conversation
+* Admin support for import review
+* Continued coach voice tuning with sample responses

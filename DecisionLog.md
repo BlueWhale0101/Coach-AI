@@ -834,3 +834,125 @@ Related docs:
 
 - `Interfaces.md`
 - `Architecture.md`
+
+DecisionLog.md Patch — Milestone 3 and Historical Import Prep
+
+2026-06-02 — get-trends Generates Missing Daily Summaries On Demand
+
+Status: accepted
+
+Decision:
+
+For v0.2, get-trends may generate or refresh missing daily_summaries for dates in the requested range when the requested metric depends on daily summaries.
+
+This applies especially to:
+
+* calories
+* protein
+* training_load
+* daily workout counts
+
+Reason:
+
+Nutrition and training trends should not appear empty simply because the user or admin has not manually run get-day-summary for every date.
+
+The GPT should be able to ask for a protein or calorie trend over a date range and receive usable data without requiring manual summary generation first.
+
+Consequences:
+
+* daily_summaries remain derived/regeneratable data.
+* get-trends can perform light summary maintenance as part of trend retrieval.
+* Trend results may update daily_summaries.updated_at.
+* The function still returns raw trend points, not coaching interpretation.
+* GPT remains responsible for interpreting the trend.
+
+Related docs:
+
+* Interfaces.md
+* Architecture.md
+
+⸻
+
+2026-06-02 — Milestone 3 Day Summaries and Trends Complete
+
+Status: accepted
+
+Decision:
+
+Declare Milestone 3 complete.
+
+Completed components:
+
+* get-day-summary Edge Function deployed and tested
+* get-trends Edge Function deployed and tested
+* GPT OpenAPI action schema updated to v0.2
+* Custom GPT tests passed for summary and trend prompts
+
+Reason:
+
+The system now supports not only logging and recall, but also useful derived summaries and trend-ready data for coaching analysis.
+
+Consequences:
+
+The working action set is now:
+
+addLogEntry
+getLogs
+searchEvents
+updateEvent
+getDaySummary
+getTrends
+
+The system can now support questions such as:
+
+How did I do today?
+How is my weight trend?
+Am I getting enough protein?
+How many workouts did I log this week?
+How has training load looked lately?
+
+Related docs:
+
+* README.md
+* Interfaces.md
+* GPTInstructions.md
+
+⸻
+
+2026-06-02 — Historical Import Becomes Next Major Phase
+
+Status: accepted
+
+Decision:
+
+Begin the historical import workflow after Milestone 3.
+
+Reason:
+
+The system now has enough stable structure to know what historical data should be converted into:
+
+* log_entries
+* fitness_events
+* daily_summaries
+* import_batches
+
+The system also has working admin visibility and correction tools, which are necessary for reviewing backfilled data.
+
+Consequences:
+
+Historical import should now focus on producing machine-readable log-entry payloads compatible with addLogEntry, grouped by import_batches.
+
+The import process should preserve raw user messages wherever possible.
+
+Imported records should use:
+
+source = chat_backfill
+
+and should set conservative confidence/review flags when dates, source spans, images, or extracted details are uncertain.
+
+Related docs:
+
+* Architecture.md
+* Interfaces.md
+* DataSemantics.md
+* README.md
