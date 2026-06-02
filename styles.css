@@ -271,3 +271,138 @@ summary {
   font-weight: 800;
   margin-top: .25rem;
 }
+
+
+
+/* v0.1.1 mobile containment patch */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  min-width: 0;
+}
+
+main,
+.app-header,
+.panel,
+.log-card,
+.summary-card,
+.event-card,
+.results,
+.tab-panel,
+.raw-text,
+.json-block,
+.metric,
+input,
+select,
+textarea,
+button {
+  min-width: 0;
+  max-width: 100%;
+}
+
+main {
+  overflow-x: hidden;
+}
+
+.app-header {
+  width: 100%;
+}
+
+.panel,
+.log-card,
+.summary-card,
+.event-card {
+  overflow: hidden;
+}
+
+.raw-text,
+.json-block,
+.event-description,
+.meta-list dd,
+.metric .value,
+.hint,
+.subtitle,
+p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.json-block {
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.tabs {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: .2rem;
+}
+
+.tab {
+  flex: 0 0 auto;
+}
+
+.card-header,
+.log-header,
+.row {
+  min-width: 0;
+}
+
+.card-header > *,
+.log-header > * {
+  min-width: 0;
+}
+
+@media (max-width: 820px) {
+  main {
+    width: calc(100vw - 1rem);
+    margin: .75rem auto 2rem;
+  }
+
+  .app-header {
+    padding: .8rem;
+  }
+
+  .panel {
+    padding: .85rem;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .log-header,
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .row {
+    align-items: stretch;
+  }
+
+  .row button {
+    width: auto;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1180px) {
+  main {
+    width: calc(100vw - 1rem);
+  }
+}
