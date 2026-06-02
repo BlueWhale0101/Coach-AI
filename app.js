@@ -422,3 +422,237 @@ setupTabs();
 setupEventTypeSelects();
 setupDefaults();
 setupEvents();
+
+
+
+// ---------------- Historical import v0.2 ----------------
+
+let importState = {
+  payloads: [],
+  results: [],
+  nextIndex: 0,
+};
+
+function normalizeImportPayload(rawPayload) {
+  const payload = { ...rawPayload };
+  delete payload.pilot_index;
+  delete payload.source_chunk;
+  delete payload.source_message_index;
+  if (!payload.source) payload.source = "chat_backfill";
+  if (!Array.isArray(payload.events)) payload.events = [];
+  return payload;
+}
+
+function parseImportJsonText() {
+  const text = $("importJson").value.trim();
+  if (!text) throw new Error("Paste or upload import JSON first.");
+
+  const parsed = JSON.parse(text);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Import JSON must be an array of addLogEntry payloads.");
+  }
+
+  const payloads = parsed.map(normalizeImportPayload);
+
+  payloads.forEach((p, i) => {
+    if (!p.occurred_date) throw new Error(`Payload ${i + 1} is missing occurred_date.`);
+    if (!p.raw_text) throw new Error(`Payload ${i + 1} is missing raw_text.`);
+    if (!p.source) throw new Error(`Payload ${i + 1} is missing source.`);
+    if (!Array.isArray(p.events)) throw new Error(`Payload ${i + 1} events must be an array.`);
+  });
+
+  return payloads;
+}
+
+function renderImportSummary() {
+  const container = $("importSummary");
+  container.innerHTML = "";
+
+  const total = importState.payloads.length;
+  const success = importState.results.filter((r) => r.ok).length;
+  const failed = importState.results.filter((r) => r.ok === false).length;
+  const pending = Math.max(0, total - importState.nextIndex);
+
+  const eventCounts = {};
+  for (const p of importState.payloads) {
+    for (const e of p.events || []) {
+      eventCounts[e.event_type] = (eventCounts[e.event_type] || 0) + 1;
+    }
+  }
+
+  const card = document.createElement("article");
+  card.className = "summary-card";
+  card.innerHTML = `
+    <h3>Import Preview</h3>
+    <div class="import-summary-grid">
+      ${metric("Payloads", total)}
+      ${metric("Next Index", importState.nextIndex)}
+      ${metric("Imported", success)}
+      ${metric("Failed", failed)}
+      ${metric("Pending", pending)}
+      ${metric("Events", Object.values(eventCounts).reduce((a,b)=>a+b,0))}
+    </div>
+    <p><strong>Event counts:</strong> ${Object.entries(eventCounts).map(([k,v]) => `${k}: ${v}`).join(", ") || "—"}</p>
+  `;
+  container.appendChild(card);
+
+  $("importNextBatchBtn").disabled = !total || importState.nextIndex >= total;
+  $("importAllBtn").disabled = !total || importState.nextIndex >= total;
+}
+
+function renderImportPayloads(limit = 25) {
+  const container = $("importResults");
+  container.innerHTML = "";
+
+  if (!importState.payloads.length) {
+    container.innerHTML = `<div class="panel">No import payloads loaded.</div>`;
+    return;
+  }
+
+  const start = Math.max(0, importState.nextIndex - 5);
+  const end = Math.min(importState.payloads.length, start + limit);
+
+  for (let i = start; i < end; i++) {
+    const p = importState.payloads[i];
+    const result = importState.results.find((r) => r.index === i);
+    const stateClass = result ? (result.ok ? "imported" : "failed") : "pending";
+
+    const card = document.createElement("article");
+    card.className = `import-payload-card ${stateClass}`;
+
+    const events = (p.events || []).map((e) => e.event_type).join(", ") || "none";
+    card.innerHTML = `
+      <div class="log-header">
+        <div>
+          <h3>#${i + 1} — ${p.occurred_date}</h3>
+          <p class="hint">${p.source || ""} · events: ${events}</p>
+        </div>
+        <button class="secondary small">Copy JSON</button>
+      </div>
+      <div class="raw-text">${p.raw_text || ""}</div>
+      ${result ? `<p class="${result.ok ? "status ok" : "status err"}">${result.ok ? "Imported" : "Failed"}: ${result.message || ""}</p>` : `<p class="status">Pending</p>`}
+      <details>
+        <summary>Payload JSON</summary>
+        <pre class="json-block">${prettyJson(p)}</pre>
+      </details>
+      ${result ? `<details><summary>Result JSON</summary><pre class="json-block">${prettyJson(result)}</pre></details>` : ""}
+    `;
+
+    card.querySelector("button").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(prettyJson(p));
+    });
+
+    container.appendChild(card);
+  }
+}
+
+function parseImport() {
+  setStatus("importStatus", "Parsing...");
+  try {
+    const payloads = parseImportJsonText();
+    importState = {
+      payloads,
+      results: [],
+      nextIndex: 0,
+    };
+    renderImportSummary();
+    renderImportPayloads();
+    setStatus("importStatus", `Parsed ${payloads.length} payload(s).`, "ok");
+  } catch (err) {
+    setStatus("importStatus", err.message, "err");
+  }
+}
+
+async function importPayloadAt(index) {
+  const original = importState.payloads[index];
+  const payload = normalizeImportPayload(original);
+  const json = await callFunction("add-log-entry", payload);
+  return json;
+}
+
+async function importNextBatch() {
+  const total = importState.payloads.length;
+  if (!total || importState.nextIndex >= total) {
+    setStatus("importStatus", "Nothing left to import.", "warn");
+    return;
+  }
+
+  const batchSize = Math.max(1, Math.min(50, Number($("importBatchSize").value || 10)));
+  const start = importState.nextIndex;
+  const end = Math.min(total, start + batchSize);
+
+  setStatus("importStatus", `Importing ${start + 1}–${end}...`);
+
+  for (let i = start; i < end; i++) {
+    try {
+      const response = await importPayloadAt(i);
+      importState.results.push({
+        index: i,
+        ok: true,
+        message: `log_entry_id=${response.log_entry_id || response.data?.log_entry_id || ""}`,
+        response,
+      });
+    } catch (err) {
+      importState.results.push({
+        index: i,
+        ok: false,
+        message: err.message,
+      });
+      // Stop on first failure. Safer for phone/admin import.
+      importState.nextIndex = i;
+      renderImportSummary();
+      renderImportPayloads();
+      setStatus("importStatus", `Stopped at #${i + 1}: ${err.message}`, "err");
+      return;
+    }
+
+    importState.nextIndex = i + 1;
+    renderImportSummary();
+  }
+
+  renderImportPayloads();
+  setStatus("importStatus", `Imported ${start + 1}–${end}.`, "ok");
+}
+
+async function importAllRemaining() {
+  while (importState.nextIndex < importState.payloads.length) {
+    await importNextBatch();
+    const last = importState.results[importState.results.length - 1];
+    if (last && last.ok === false) return;
+    // Tiny pause so mobile browser can breathe.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  setStatus("importStatus", "All remaining payloads imported.", "ok");
+}
+
+function resetImport() {
+  importState = { payloads: [], results: [], nextIndex: 0 };
+  $("importJson").value = "";
+  $("importFile").value = "";
+  renderImportSummary();
+  renderImportPayloads();
+  setStatus("importStatus", "Reset.", "warn");
+}
+
+function setupImportEvents() {
+  $("importFile").addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      $("importJson").value = text;
+      setStatus("importStatus", `Loaded ${file.name}.`, "ok");
+    } catch (err) {
+      setStatus("importStatus", err.message, "err");
+    }
+  });
+
+  $("parseImportBtn").addEventListener("click", parseImport);
+  $("importNextBatchBtn").addEventListener("click", importNextBatch);
+  $("importAllBtn").addEventListener("click", importAllRemaining);
+  $("resetImportBtn").addEventListener("click", resetImport);
+}
+
+// Run after existing setup.
+setupImportEvents();
+renderImportSummary();

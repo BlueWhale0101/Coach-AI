@@ -12,7 +12,7 @@
       <h1>Coach AI Admin</h1>
       <p class="subtitle">Lightweight debug console for logs, events, summaries, and corrections.</p>
     </div>
-    <div class="version">v0.1.2</div>
+    <div class="version">v0.2</div>
   </header>
 
   <main>
@@ -44,6 +44,7 @@
       <button class="tab" data-tab="search">Search</button>
       <button class="tab" data-tab="summary">Day Summary</button>
       <button class="tab" data-tab="edit">Edit Event</button>
+      <button class="tab" data-tab="import">Import</button>
     </nav>
 
     <section id="logs" class="tab-panel active">
@@ -187,6 +188,48 @@
       </div>
       <div id="editResults" class="results"></div>
     </section>
+
+    <section id="import" class="tab-panel">
+      <div class="panel">
+        <h2>Historical Import</h2>
+        <p class="hint">
+          Paste or upload an array of addLogEntry payloads. The importer calls <code>add-log-entry</code>
+          in small batches. Review before importing. Raw text is preserved by the payloads.
+        </p>
+
+        <div class="grid two">
+          <label>
+            Upload JSON file
+            <input id="importFile" type="file" accept=".json,application/json" />
+          </label>
+          <label>
+            Batch Size
+            <input id="importBatchSize" type="number" min="1" max="50" value="10" />
+          </label>
+        </div>
+
+        <label>
+          Import JSON
+          <textarea id="importJson" rows="12" spellcheck="false" placeholder='[{"occurred_date":"2026-05-01","raw_text":"...","source":"chat_backfill","events":[]}]'></textarea>
+        </label>
+
+        <div class="row">
+          <button id="parseImportBtn">Parse / Preview</button>
+          <button id="importNextBatchBtn" class="secondary" disabled>Import next batch</button>
+          <button id="importAllBtn" class="secondary" disabled>Import all remaining</button>
+          <button id="resetImportBtn" class="secondary">Reset</button>
+          <span id="importStatus" class="status"></span>
+        </div>
+
+        <p class="hint">
+          Import state is kept in memory only. Re-parse the file if you refresh the page.
+        </p>
+      </div>
+
+      <div id="importSummary" class="results"></div>
+      <div id="importResults" class="results"></div>
+    </section>
+
   </main>
 
   <template id="eventTemplate">

@@ -472,3 +472,38 @@ select {
     width: 100%;
   }
 }
+
+
+/* v0.2 import tab */
+.import-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .8rem;
+}
+
+.import-payload-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.import-payload-card.imported {
+  border-color: var(--accent-2);
+}
+
+.import-payload-card.failed {
+  border-color: var(--danger);
+}
+
+.import-payload-card.pending {
+  border-color: var(--line);
+}
+
+code {
+  background: #0d0f13;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: .05rem .25rem;
+}
