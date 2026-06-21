@@ -1,0 +1,846 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Coach AI Fitness Logging Actions",
+    "version": "0.2.0",
+    "description": "Custom GPT action schema for the Fitness Logging & Analysis System v0.2."
+  },
+  "servers": [
+    {
+      "url": "https://zjgklcigytxvjexiizdn.supabase.co/functions/v1",
+      "description": "Supabase Edge Functions"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ActionSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Action-Secret",
+        "description": "Shared secret stored as ACTION_API_SECRET in Supabase Edge Function secrets."
+      }
+    },
+    "schemas": {
+      "JsonObject": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Flexible JSON object."
+      },
+      "FitnessEventInput": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "meal",
+              "workout",
+              "weigh_in",
+              "recovery",
+              "sleep",
+              "note",
+              "social_event",
+              "alcohol",
+              "symptom"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "occurred_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Local time in HH:MM format if known."
+          },
+          "source_text_span": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "facts": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "estimates": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "interpretations": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "extraction_confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "estimate_confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "needs_review": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "event_type",
+          "description",
+          "facts",
+          "estimates",
+          "interpretations"
+        ],
+        "additionalProperties": false
+      },
+      "AddLogEntryRequest": {
+        "type": "object",
+        "properties": {
+          "occurred_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "occurred_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Local time in HH:MM format if known."
+          },
+          "raw_text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "gpt_action",
+              "chat_backfill",
+              "web_admin",
+              "manual"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FitnessEventInput"
+            }
+          }
+        },
+        "required": [
+          "occurred_date",
+          "raw_text",
+          "source",
+          "events"
+        ],
+        "additionalProperties": false
+      },
+      "EventChanges": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "meal",
+              "workout",
+              "weigh_in",
+              "recovery",
+              "sleep",
+              "note",
+              "social_event",
+              "alcohol",
+              "symptom"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "occurred_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "occurred_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_text_span": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "facts": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "estimates": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "interpretations": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "extraction_confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "estimate_confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "needs_review": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateEventRequest": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changes": {
+            "$ref": "#/components/schemas/EventChanges"
+          },
+          "change_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "event_id",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "GetLogsRequest": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "meal",
+                  "workout",
+                  "weigh_in",
+                  "recovery",
+                  "sleep",
+                  "note",
+                  "social_event",
+                  "alcohol",
+                  "symptom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "include_raw": {
+            "type": "boolean",
+            "default": true
+          },
+          "include_events": {
+            "type": "boolean",
+            "default": true
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "additionalProperties": false
+      },
+      "SearchEventsRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "meal",
+                  "workout",
+                  "weigh_in",
+                  "recovery",
+                  "sleep",
+                  "note",
+                  "social_event",
+                  "alcohol",
+                  "symptom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "needs_review": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "GetDaySummaryRequest": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "generate_if_missing": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "GetTrendsRequest": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "bodyweight",
+              "calories",
+              "protein",
+              "workouts",
+              "training_load",
+              "recovery",
+              "sleep",
+              "hunger",
+              "energy"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week"
+            ],
+            "default": "day"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "meal",
+                  "workout",
+                  "weigh_in",
+                  "recovery",
+                  "sleep",
+                  "note",
+                  "social_event",
+                  "alcohol",
+                  "symptom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "query": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "include_raw": {
+            "type": "boolean",
+            "default": false
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "metric",
+          "start_date",
+          "end_date"
+        ],
+        "additionalProperties": false
+      },
+      "GenericSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Flexible JSON object."
+          }
+        },
+        "additionalProperties": true
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Flexible JSON object."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "security": [
+    {
+      "ActionSecret": []
+    }
+  ],
+  "paths": {
+    "/add-log-entry": {
+      "post": {
+        "operationId": "addLogEntry",
+        "summary": "Add a raw conversational log entry and extracted fitness events.",
+        "description": "Stores raw_text in log_entries and zero or more structured fitness_events. Use for normal conversational logging.",
+        "security": [
+          {
+            "ActionSecret": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLogEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get-logs": {
+      "post": {
+        "operationId": "getLogs",
+        "summary": "Retrieve raw logs and extracted events for a date range.",
+        "description": "Use for date-bounded recall, such as meals yesterday or workouts last week.",
+        "security": [
+          {
+            "ActionSecret": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetLogsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search-events": {
+      "post": {
+        "operationId": "searchEvents",
+        "summary": "Search fitness events by keyword, type, review flag, and optional date range.",
+        "description": "Use for fuzzy recall: find HYROX workouts, eggs, low energy, or records needing review.",
+        "security": [
+          {
+            "ActionSecret": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchEventsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/update-event": {
+      "post": {
+        "operationId": "updateEvent",
+        "summary": "Update a structured fitness event without changing the original raw log.",
+        "description": "Use for corrections and review updates. Raw log text remains unchanged.",
+        "security": [
+          {
+            "ActionSecret": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Event not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get-day-summary": {
+      "post": {
+        "operationId": "getDaySummary",
+        "summary": "Retrieve or generate a mechanical day summary.",
+        "description": "Use for day-level review. This returns mechanical aggregate data; GPT provides coaching interpretation.",
+        "security": [
+          {
+            "ActionSecret": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetDaySummaryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get-trends": {
+      "post": {
+        "operationId": "getTrends",
+        "summary": "Retrieve trend-ready data points for analysis.",
+        "description": "Use for progress, patterns, weekly trends, weight trend, protein trend, training load, recovery, hunger, energy, and sleep analysis.",
+        "security": [
+          {
+            "ActionSecret": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetTrendsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
