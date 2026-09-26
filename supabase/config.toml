@@ -100,3 +100,66 @@ verify_jwt = false
 
 [functions.record-recurrence-occurrence]
 verify_jwt = false
+
+[functions.create-category]
+verify_jwt = false
+
+[functions.update-category]
+verify_jwt = false
+
+[functions.archive-category]
+verify_jwt = false
+
+[functions.get-category]
+verify_jwt = false
+
+[functions.list-categories]
+verify_jwt = false
+
+[functions.set-object-category]
+verify_jwt = false
+
+[functions.clear-object-category]
+verify_jwt = false
+
+[functions.create-tag]
+verify_jwt = false
+
+[functions.update-tag]
+verify_jwt = false
+
+[functions.archive-tag]
+verify_jwt = false
+
+[functions.get-tag]
+verify_jwt = false
+
+[functions.list-tags]
+verify_jwt = false
+
+[functions.add-object-tag]
+verify_jwt = false
+
+[functions.remove-object-tag]
+verify_jwt = false
+
+[functions.get-object-classification]
+verify_jwt = false
+
+[functions.list-category-members]
+verify_jwt = false
+
+[functions.list-tag-members]
+verify_jwt = false
+
+[functions.pin-object]
+verify_jwt = false
+
+[functions.unpin-object]
+verify_jwt = false
+
+[functions.is-object-pinned]
+verify_jwt = false
+
+[functions.list-pinned-objects]
+verify_jwt = false
