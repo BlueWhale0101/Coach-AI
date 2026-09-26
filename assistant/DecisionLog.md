@@ -98,3 +98,16 @@ Consequences:
 - Generic update changes title/content only; archiving is a semantic operation.
 - V0 has no unarchive or public delete operation.
 - Knowledge contains no source-specific provenance, tags/categories, entities, reminders, recurrence, embeddings, arbitrary JSON metadata, or scheduling semantics.
+
+
+## 2026-09-26 — Reminders V0 Owns Time-Based Surfacing Requests
+
+**Status:** Accepted
+
+Reminders owns how Assistant.AI represents a request for an existing registered object to be surfaced at a particular time.
+
+A reminder is a separate registry object targeting a substantive Assistant object. V0 supports one absolute `remind_at` timestamp and a `pending -> delivered|cancelled` lifecycle. Delivery means the reminder has been processed and handed to the configured surfacing mechanism; it does not assert that the human saw it.
+
+Reminder targets may be Tasks, Knowledge, or future substantive registry types, but V0 prohibits reminders targeting reminders. Target lifecycle changes do not implicitly cancel or delete reminders.
+
+Recurrence, natural-language time parsing, delivery channels/providers, acknowledgement, snooze, and duplicated reminder text are deliberately outside the module.
