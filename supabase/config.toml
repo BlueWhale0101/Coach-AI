@@ -76,3 +76,27 @@ verify_jwt = false
 
 [functions.search-schedule-events]
 verify_jwt = false
+
+[functions.create-recurrence]
+verify_jwt = false
+
+[functions.update-recurrence]
+verify_jwt = false
+
+[functions.end-recurrence]
+verify_jwt = false
+
+[functions.get-recurrence]
+verify_jwt = false
+
+[functions.list-recurrences]
+verify_jwt = false
+
+[functions.list-due-recurrence-occurrences]
+verify_jwt = false
+
+[functions.next-after-completion]
+verify_jwt = false
+
+[functions.record-recurrence-occurrence]
+verify_jwt = false
