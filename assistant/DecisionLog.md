@@ -111,3 +111,16 @@ A reminder is a separate registry object targeting a substantive Assistant objec
 Reminder targets may be Tasks, Knowledge, or future substantive registry types, but V0 prohibits reminders targeting reminders. Target lifecycle changes do not implicitly cancel or delete reminders.
 
 Recurrence, natural-language time parsing, delivery channels/providers, acknowledgement, snooze, and duplicated reminder text are deliberately outside the module.
+
+
+## 2026-09-26 — Scheduling V0 Owns Calendar Placement
+
+**Status:** Accepted
+
+Scheduling owns how Assistant.AI represents something positioned on a calendar. It distinguishes timed intervals from all-day date intervals rather than encoding all-day events as midnight timestamps.
+
+Timed events preserve both absolute start/end instants and a validated IANA/PostgreSQL timezone name for human calendar context. All-day events use half-open date intervals with an exclusive end date. The two temporal representations are mutually exclusive.
+
+Schedule events have a `scheduled -> cancelled` lifecycle; there is no completed state. Rescheduling preserves event identity, and scheduled events may atomically convert between complete timed and all-day representations.
+
+Recurrence, reminders, natural-language time parsing, location/entities, attendees, provider-specific calendar IDs, and external synchronization are deliberately outside Scheduling V0.
