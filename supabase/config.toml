@@ -58,3 +58,21 @@ verify_jwt = false
 
 [functions.list-reminders]
 verify_jwt = false
+
+[functions.create-schedule-event]
+verify_jwt = false
+
+[functions.update-schedule-event]
+verify_jwt = false
+
+[functions.cancel-schedule-event]
+verify_jwt = false
+
+[functions.get-schedule-event]
+verify_jwt = false
+
+[functions.list-schedule-events]
+verify_jwt = false
+
+[functions.search-schedule-events]
+verify_jwt = false
