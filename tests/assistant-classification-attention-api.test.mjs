@@ -120,9 +120,14 @@ test("attention endpoints validate, route, envelope and page", async () => {
   assert.equal((await attentionCall("list_pinned_objects", { offset: 10001 }, repository))[1].code, "INVALID_PAGINATION");
 });
 
-test("repositories map RPCs, ranges and safe database failures", async () => {
+test("repositories map RPCs, pagination sentinels and safe database failures", async () => {
   const calls = [];
-  const rpc = async (name, params) => { calls.push([name, params]); return { data: name.includes("list") ? [pin, pin] : [category], error: null }; };
+  const rpc = async (name, params) => {
+    calls.push([name, params]);
+    if (name === "assistant_list_categories") return { data: [category, category], error: null };
+    if (name === "assistant_list_tags") return { data: [tag, tag], error: null };
+    return { data: name.includes("list") ? [pin, pin] : [category], error: null };
+  };
   const chain = {
     select: () => chain,
     eq: () => chain,
@@ -134,7 +139,9 @@ test("repositories map RPCs, ranges and safe database failures", async () => {
   await classificationRepo.createCategory({ name: "Home", color: "#000000", sort_order: 0 });
   assert.deepEqual(calls[0], ["assistant_create_category", { p_name: "Home", p_color: "#000000", p_sort_order: 0 }]);
   assert.deepEqual(await classificationRepo.listCategories({ limit: 1, offset: 3 }), { rows: [category], hasMore: true });
-  assert.ok(calls.some(x => x[0] === "range" && x[1] === 3 && x[2] === 4));
+  assert.deepEqual(calls.at(-1), ["assistant_list_categories", { p_status: null, p_limit: 2, p_offset: 3 }]);
+  assert.deepEqual(await classificationRepo.listTags({ status: "active", limit: 1, offset: 4 }), { rows: [tag], hasMore: true });
+  assert.deepEqual(calls.at(-1), ["assistant_list_tags", { p_status: "active", p_limit: 2, p_offset: 4 }]);
   await assert.rejects(() => classificationRepo.getCategory(id), error => error.code === "CATEGORY_NOT_FOUND");
   const attentionRepo = new SupabaseAttentionRepository({ rpc });
   assert.deepEqual(await attentionRepo.list({ limit: 1, offset: 2 }), { rows: [pin], hasMore: true });
