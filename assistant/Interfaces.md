@@ -400,3 +400,80 @@ Errors include `UNAUTHORIZED`, `INVALID_JSON`, `INVALID_OBJECT_ID`,
 tables/indexes/triggers/functions and a registry type guard. RLS is on;
 anonymous/authenticated roles have no table or RPC privileges; Recurrence
 capabilities are `SECURITY INVOKER` and service-role-only.
+
+---
+
+# Assistant.AI Classification API — V0
+
+Classification owns primary Categories and flexible Tags across registered
+Assistant objects. It does not add category/tag fields to Tasks, Knowledge,
+Scheduling, Reminders, Recurrence, or Coach tables. Categories and Tags are
+registry objects; assignment rows are Classification-private relationship
+state.
+
+All operations are `POST` Edge Functions with `OPTIONS` preflight,
+`X-Action-Secret` or Bearer fallback authentication, and the standard
+`{ "ok": true, "data": ... }` / safe error envelope. Every function is declared
+with `verify_jwt = false` and uses the server-side service role.
+
+| Function | Request | Response data |
+| --- | --- | --- |
+| `create-category` | `name`, `color`, optional `sort_order` | `{ "category": Category }` |
+| `update-category` | `object_id`, one or more of `name`, `color`, `sort_order` | `{ "category": Category }` |
+| `archive-category` | `object_id` | `{ "category": Category }` |
+| `get-category` | `object_id` | `{ "category": Category }` |
+| `list-categories` | Optional `status`, `limit`, `offset` | `{ "categories": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
+| `set-object-category` | `target_object_id`, active `category_object_id` | `{ "classification": Classification }` |
+| `clear-object-category` | `target_object_id` | `{ "classification": Classification }` |
+| `create-tag` | `name` | `{ "tag": Tag }` |
+| `update-tag` | `object_id`, `name` | `{ "tag": Tag }` |
+| `archive-tag` | `object_id` | `{ "tag": Tag }` |
+| `get-tag` | `object_id` | `{ "tag": Tag }` |
+| `list-tags` | Optional `status`, `limit`, `offset` | `{ "tags": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
+| `add-object-tag` | `target_object_id`, active `tag_object_id` | `{ "classification": Classification }` |
+| `remove-object-tag` | `target_object_id`, `tag_object_id` | `{ "classification": Classification }` |
+| `get-object-classification` | `target_object_id` | `{ "classification": Classification }` |
+| `list-category-members` | `category_object_id`, optional `limit`, `offset` | `{ "members": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
+| `list-tag-members` | `tag_object_id`, optional `limit`, `offset` | `{ "members": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
+
+Category names and Tag names are nonblank and case-insensitively unique within
+their kind. Category color is canonical `#RRGGBB`; lowercase input is stored
+uppercase. Category list order is `sort_order ASC, name ASC, object_id ASC`.
+Tag list order is `name ASC, object_id ASC`. Member lists return target
+registry identities only, ordered by `target_object_id ASC`, so callers can
+compose with owning module interfaces without Classification reading private
+module tables.
+
+Archiving a Category or Tag is terminal. Archived Categories and Tags cannot be
+newly assigned, but existing assignments remain readable and removable. Setting
+a Category atomically replaces the previous Category for the target. Clearing a
+Category and removing a Tag are idempotent. Adding an already assigned Tag is
+idempotent and preserves the original assignment timestamp.
+
+---
+
+# Assistant.AI Attention API — V0
+
+Attention owns explicit user-selected prominence. A pin is relationship state,
+not a registry object. It references an existing Assistant registry object and
+does not change Task priority or any other target state.
+
+All operations follow the same `POST`, `OPTIONS`, action-secret, service-role,
+and response-envelope conventions as the other Assistant APIs.
+
+| Function | Request | Response data |
+| --- | --- | --- |
+| `pin-object` | `target_object_id` | `{ "pin": Pin }` |
+| `unpin-object` | `target_object_id` | `{ "pin": { "target_object_id": "...", "pinned": false, "pinned_at": null } }` |
+| `is-object-pinned` | `target_object_id` | `{ "pin": { "target_object_id": "...", "pinned": true/false, "pinned_at": "..." } }` |
+| `list-pinned-objects` | Optional `limit`, `offset` | `{ "pins": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
+
+`pin-object` requires an existing registry target and is idempotent. Re-pinning
+preserves the original `pinned_at`. `unpin-object` is idempotent. Listing is
+bounded and deterministic: `pinned_at DESC, target_object_id ASC`.
+
+Forward migration `20260926112231_assistant_classification_attention_v0.sql`
+adds only Classification-owned tables, Attention-owned pin state, invoker
+capability RPCs, RLS, explicit service-role grants, and the forward Recurrence
+index `assistant_recurrences_seed_object_idx` for seed-only recurrence filters.
+Existing module tables and protected Coach contracts are unchanged.
