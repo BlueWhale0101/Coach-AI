@@ -39,9 +39,7 @@ export class SupabaseClassificationRepository {
     return one(data, error, "CATEGORY");
   }
   async listCategories(options) {
-    let query = this.client.from("assistant_categories").select("*");
-    if (options.status !== undefined) query = query.eq("status", options.status);
-    const { data, error } = await query.order("sort_order", { ascending: true }).order("name", { ascending: true }).order("object_id", { ascending: true }).range(options.offset, options.offset + options.limit);
+    const { data, error } = await this.client.rpc("assistant_list_categories", { p_status: options.status ?? null, p_limit: options.limit + 1, p_offset: options.offset });
     return page(data, error, options.limit, "CATEGORY");
   }
   async setObjectCategory(targetId, categoryId) {
@@ -71,9 +69,7 @@ export class SupabaseClassificationRepository {
     return one(data, error, "TAG");
   }
   async listTags(options) {
-    let query = this.client.from("assistant_tags").select("*");
-    if (options.status !== undefined) query = query.eq("status", options.status);
-    const { data, error } = await query.order("name", { ascending: true }).order("object_id", { ascending: true }).range(options.offset, options.offset + options.limit);
+    const { data, error } = await this.client.rpc("assistant_list_tags", { p_status: options.status ?? null, p_limit: options.limit + 1, p_offset: options.offset });
     return page(data, error, options.limit, "TAG");
   }
   async addObjectTag(targetId, tagId) {
