@@ -41,3 +41,20 @@ verify_jwt = false
 [functions.search-knowledge]
 verify_jwt = false
 
+[functions.create-reminder]
+verify_jwt = false
+
+[functions.update-reminder-time]
+verify_jwt = false
+
+[functions.cancel-reminder]
+verify_jwt = false
+
+[functions.mark-reminder-delivered]
+verify_jwt = false
+
+[functions.get-reminder]
+verify_jwt = false
+
+[functions.list-reminders]
+verify_jwt = false

@@ -166,3 +166,56 @@ registry and Knowledge rows in one PostgreSQL transaction. All Knowledge RPCs
 are `SECURITY INVOKER`; the table has RLS enabled, no `anon` or `authenticated`
 table access, and explicit service-role privileges. The registry's open-ended
 object-type format and the existing Tasks and Coach contracts are unchanged.
+
+---
+
+# Assistant.AI Reminders API — V0
+
+Each operation is a `POST` Supabase Edge Function with `OPTIONS` preflight. It
+uses the Assistant action secret and success/error envelopes described above;
+all six functions declare `verify_jwt = false` in `supabase/config.toml` so the
+handler can authenticate `X-Action-Secret` (or the Bearer fallback). The service
+role key stays on the server. No natural-language parsing or delivery worker is
+included.
+
+A returned reminder contains `object_id`, `target_object_id`, `remind_at`,
+`status` (`pending`, `delivered`, `cancelled`), nullable `delivered_at` and
+`cancelled_at`, `created_at`, and `updated_at`. Delivery means processing and
+handoff to a surfacing mechanism; it does not establish human acknowledgement.
+The target is an existing substantive Assistant object (including a completed
+Task or archived Knowledge item), never a reminder.
+
+| Function | Request | Response data |
+| --- | --- | --- |
+| `create-reminder` | Required `target_object_id` UUID, absolute `remind_at` | `{ "reminder": Reminder }` |
+| `update-reminder-time` | Required `object_id` UUID, new `remind_at` | `{ "reminder": Reminder }` |
+| `cancel-reminder` | Required `object_id` UUID | `{ "reminder": Reminder }` |
+| `mark-reminder-delivered` | Required `object_id` UUID | `{ "reminder": Reminder }` |
+| `get-reminder` | Required `object_id` UUID | `{ "reminder": Reminder }` |
+| `list-reminders` | Optional `status`, `target_object_id`, `due_after`, `due_before`, `limit`, `offset` | Page described below |
+
+All caller timestamps must be ISO 8601 with `Z` or an explicit UTC offset.
+`due_after` and `due_before` are inclusive bounds on `remind_at`. When both
+are supplied, the first must not be later than the second. List defaults to
+limit 50, offset 0; limit is an integer from 1 to 100. Ordering is
+`remind_at ASC, created_at ASC, object_id ASC`. One extra row determines
+`has_more`:
+
+```json
+{ "reminders": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }
+```
+
+Missing/wrong-type reminder IDs return `REMINDER_NOT_FOUND` (404); missing
+targets return `TARGET_NOT_FOUND` (404). Self-targets and reminder targets
+return `INVALID_TARGET` (400). Attempts to mutate a terminal reminder return
+`INVALID_TRANSITION` (409). Other errors include `UNAUTHORIZED`, `INVALID_JSON`,
+`INVALID_OBJECT_ID`, `INVALID_TIMESTAMP`, `INVALID_TIME_WINDOW`,
+`INVALID_PAGINATION`, `IMMUTABLE_FIELD`, `VALIDATION_ERROR`, and a safe
+`DATABASE_ERROR`. Lifecycle changes only through the semantic API operations.
+
+Migration `20260926095952_assistant_reminders_v0.sql` adds the Reminders table,
+referential checks and lifecycle triggers, and invoker create/update-time/cancel/
+deliver RPCs. Registry and reminder creation share a PostgreSQL transaction.
+The table has RLS enabled, no `anon` or `authenticated` access, and explicit
+service-role grants. No public delete, search, recurrence, or notification
+delivery capability exists in V0.
