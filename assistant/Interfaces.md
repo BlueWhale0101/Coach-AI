@@ -477,3 +477,101 @@ adds only Classification-owned tables, Attention-owned pin state, invoker
 capability RPCs, RLS, explicit service-role grants, and the forward Recurrence
 index `assistant_recurrences_seed_object_idx` for seed-only recurrence filters.
 Existing module tables and protected Coach contracts are unchanged.
+
+---
+
+# Assistant.AI Projection API — Household Board V0
+
+Projection owns read-only assembly for consumption surfaces. It owns no durable
+household state and has no mutation operations.
+
+## `get-household-board`
+
+This is a `POST` Edge Function with `OPTIONS` preflight, the standard
+`X-Action-Secret`/Bearer fallback, service-role backend access, and the same
+success/error envelope as other Assistant capabilities. It is declared with
+`verify_jwt = false`.
+
+Request fields are optional:
+
+```json
+{
+  "display_date": "2026-09-27",
+  "timezone": "Australia/Darwin",
+  "now": "2026-09-27T07:30:00+09:30",
+  "task_limit": 15
+}
+```
+
+`timezone` defaults to `Australia/Darwin` and is validated by PostgreSQL
+timezone names. `display_date` defaults to the local date of `now` in that
+timezone. `task_limit` defaults to 15 and is bounded to 1-50.
+
+Response data is:
+
+```json
+{
+  "board": {
+    "metadata": {
+      "generated_at": "...",
+      "now": "...",
+      "timezone": "Australia/Darwin",
+      "today": "2026-09-27",
+      "tomorrow": "2026-09-28",
+      "task_limit": 15,
+      "task_policy": "projection_v0_pinned_overdue_due_soon_actionable"
+    },
+    "tasks": [],
+    "days": [
+      {
+        "id": "today",
+        "date": "2026-09-27",
+        "all_day_events": [],
+        "timed_events": []
+      },
+      {
+        "id": "tomorrow",
+        "date": "2026-09-28",
+        "all_day_events": [],
+        "timed_events": []
+      }
+    ]
+  }
+}
+```
+
+Tasks contain the Task-owned display fields (`object_id`, `title`, nullable
+`description`, status, priority, nullable `not_before`, nullable `due_at`),
+Attention pin state, Classification category/tags when assigned, and a
+Projection-owned `surface_reason`.
+
+V0 task surfacing includes open Tasks when they are pinned, overdue, due within
+the next seven local calendar days, or currently actionable (`not_before` null
+or no later than `now`). Ordering is:
+
+1. pinned;
+2. overdue;
+3. due soon;
+4. actionable;
+5. `due_at ASC NULLS LAST`;
+6. `pinned_at DESC NULLS LAST`;
+7. task `created_at ASC`;
+8. `object_id ASC`.
+
+Due dates are not invented. Missing `due_at` stays null and should render as a
+blank deadline area in the tablet UI.
+
+Calendar events contain Scheduling-owned timed/all-day fields plus category and
+pin state when assigned. Today and Tomorrow are complete local dates in the
+requested timezone. Timed windows are converted to absolute instants for
+Scheduling overlap semantics; all-day windows use Scheduling's half-open date
+intervals. Empty time is not represented.
+
+Errors include `UNAUTHORIZED`, `INVALID_JSON`, `INVALID_DATE`,
+`INVALID_TIMESTAMP`, `INVALID_TIMEZONE`, `INVALID_PAGINATION`,
+`VALIDATION_ERROR`, `IMMUTABLE_FIELD`, and safe `DATABASE_ERROR`.
+
+Forward migration `20260927074730_assistant_projection_household_board_v0.sql`
+adds no tables. It adds only read-only `SECURITY INVOKER` Projection RPCs and
+service-role-only execute grants. Existing Coach and Assistant module
+contracts are unchanged.

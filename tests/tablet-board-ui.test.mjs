@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getBoardSnapshot, categories } from "../tablet-board/data-provider.mjs";
+import { getFixtureBoardSnapshot, categories } from "../tablet-board/data-provider.mjs";
 import {
   PIXELS_PER_HOUR,
   layoutTimedEvents,
@@ -9,7 +9,7 @@ import {
 } from "../tablet-board/calendar-layout.mjs";
 
 test("tablet board fixtures stay rich enough to exercise the household UI", () => {
-  const snapshot = getBoardSnapshot();
+  const snapshot = getFixtureBoardSnapshot();
   assert.ok(snapshot.tasks.length >= 12);
   assert.ok(Object.keys(categories).length >= 5);
   assert.ok(snapshot.tasks.some((task) => task.deadlineLabel === ""));
