@@ -55,3 +55,15 @@ The repository is the durable source of architectural intent.
 - Throwaway chats: substantial enhancement rounds with explicit entry and exit gates.
 
 Implementation agents should be able to understand module ownership without reconstructing prior conversations.
+
+
+## Deployment model
+
+The repository is connected to the shared Supabase project through GitHub integration. Changes merged to deployment-managed Supabase definitions can therefore deploy automatically; merging such changes is a production-affecting operation, not merely source control bookkeeping.
+
+Development rules:
+- Treat a PR that changes Supabase migrations or Edge Functions as a deployment review gate.
+- Do not assume a separate manual deploy step will follow merge.
+- Before merge, review database privileges, RLS posture, Edge Function authentication, and compatibility with Coach.AI.
+- After merge, verify the live Supabase state and run relevant integration checks/advisors.
+- Never rewrite an already-applied migration to represent a later production change. Add a new forward migration so repository history and Supabase migration history remain reproducible.
