@@ -219,3 +219,79 @@ deliver RPCs. Registry and reminder creation share a PostgreSQL transaction.
 The table has RLS enabled, no `anon` or `authenticated` access, and explicit
 service-role grants. No public delete, search, recurrence, or notification
 delivery capability exists in V0.
+
+---
+
+# Assistant.AI Scheduling API — V0
+
+Each Scheduling capability is a `POST` Supabase Edge Function with `OPTIONS`
+preflight. It uses the Assistant `X-Action-Secret` header (or Bearer fallback),
+and the same success/error envelopes documented above. The service-role key
+stays in the Edge Function. Every new function is declared with
+`verify_jwt = false` in `supabase/config.toml` for handler authentication.
+
+A returned event has stable `object_id`, `title`, nullable `description`,
+`time_kind`, nullable `starts_at`, `ends_at`, `timezone`, `start_date`,
+`end_date`, `status`, `cancelled_at`, `created_at`, and `updated_at`. Timed events
+have `time_kind: "timed"`, absolute start/end instants with `Z` or explicit
+offset, and a separately supplied timezone name for display context. The
+database validates the name against PostgreSQL timezone data. All-day events
+have `time_kind: "all_day"` and ISO dates with an **exclusive** `end_date`;
+they have no timestamp or timezone fields. A single-day event on November 14
+uses `start_date: "2026-11-14"` and `end_date: "2026-11-15"`.
+
+| Function | Request | Response data |
+| --- | --- | --- |
+| `create-schedule-event` | Required `title` and one complete timed (`time_kind`, `starts_at`, `ends_at`, `timezone`) or all-day (`time_kind`, `start_date`, `end_date`) representation; optional nullable `description` | `{ "event": Event }` |
+| `update-schedule-event` | `object_id` plus `title`, `description`, or a **complete** replacement timed/all-day representation | `{ "event": Event }` |
+| `cancel-schedule-event` | `object_id` | `{ "event": Event }` |
+| `get-schedule-event` | `object_id` | `{ "event": Event }` |
+| `list-schedule-events` | Optional `status`, window pairs below, `limit`, `offset` | Page below |
+| `search-schedule-events` | Required nonblank `query`; optional `status`, `limit`, `offset` | Page below |
+
+An update with any temporal field requires the entire new representation,
+even when staying in the same kind. A timed/all-day conversion replaces all
+temporal fields in one database update. Only scheduled events can be updated
+or cancelled. There is no public delete or completed status.
+
+Calendar overlap fields are **optional complete pairs**:
+
+- `timed_overlap_start` and `timed_overlap_end`: absolute timestamps defining
+  a half-open interval `[start, end)` for timed events.
+- `all_day_overlap_start` and `all_day_overlap_end`: ISO dates defining a
+  half-open date interval `[start, end)` for all-day events.
+
+Each start must precede its end. An event overlaps a window when its start is
+strictly before the window end and its end is strictly after the window start.
+With only one pair, results contain only that event kind; with both pairs,
+results contain the matching events of both kinds. With neither, all event
+kinds are eligible. No date is converted using the server timezone. Optional
+`status` is `scheduled` or `cancelled` in both list and search.
+
+List and search default to `limit: 50`, `offset: 0`; limit is an integer from
+1 to 100. They fetch one extra row to compute `has_more`:
+
+```json
+{ "events": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }
+```
+
+Chronological order is the event's local calendar date (all-day `start_date`
+or timed `starts_at` in its stored timezone), with all-day events first on a
+date, then timed start instant, creation time, and object ID ascending. Search
+V0 matches title and description case-insensitively; callers should depend on
+the search capability, not its current matching algorithm.
+
+Errors include `EVENT_NOT_FOUND` (404), `INVALID_TRANSITION` (409),
+`INVALID_OBJECT_ID`, `INVALID_TIMESTAMP`, `INVALID_DATE`, `INVALID_TIMEZONE`,
+`INVALID_TIME_WINDOW`, `INVALID_PAGINATION`, `MISSING_REQUIRED_FIELD`,
+`IMMUTABLE_FIELD`, `VALIDATION_ERROR`, `UNAUTHORIZED`, `INVALID_JSON`, and
+safe `DATABASE_ERROR`. Missing or wrong-type event IDs return
+`EVENT_NOT_FOUND`. Invalid timezone names are rejected at the database
+boundary and returned as `INVALID_TIMEZONE`.
+
+Forward migration `20260926102646_assistant_scheduling_v0.sql` adds the event
+table, representation and lifecycle checks, registry type guards, timezone
+validation, and invoker capability RPCs. Registry and event creation are one
+transaction. RLS is enabled with no direct anon/authenticated table access;
+only the service role has the required table and RPC privileges. Existing
+Tasks, Knowledge, Reminders, and Coach contracts are unchanged.
