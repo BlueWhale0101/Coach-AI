@@ -105,6 +105,32 @@ test("Classification and Attention PostgreSQL contracts", async t => {
     assert.equal(listedCategories[0].object_id, cat2.object_id);
   });
 
+  await t.test("category and tag listing uses documented case-insensitive SQL ordering across pages", async () => {
+    const categoryAlpha = await category("alpha", "#010101", -1000);
+    const categoryBravo = await category("Bravo", "#020202", -1000);
+    const categoryCharlie = await category("charlie", "#030303", -1000);
+    assert.deepEqual(
+      (await rows("select object_id from public.assistant_list_categories('active',2,0)")).map(x => x.object_id),
+      [categoryAlpha.object_id, categoryBravo.object_id]
+    );
+    assert.deepEqual(
+      (await rows("select object_id from public.assistant_list_categories('active',2,1)")).map(x => x.object_id),
+      [categoryBravo.object_id, categoryCharlie.object_id]
+    );
+
+    const tagAlpha = await tag("alpha-tag");
+    const tagBravo = await tag("Bravo-tag");
+    const tagCharlie = await tag("charlie-tag");
+    assert.deepEqual(
+      (await rows("select object_id from public.assistant_list_tags('active',2,0)")).map(x => x.object_id),
+      [tagAlpha.object_id, tagBravo.object_id]
+    );
+    assert.deepEqual(
+      (await rows("select object_id from public.assistant_list_tags('active',2,1)")).map(x => x.object_id),
+      [tagBravo.object_id, tagCharlie.object_id]
+    );
+  });
+
   await t.test("attention pins existing targets, is idempotent, lists deterministically, and does not mutate targets", async () => {
     const a = await task("Pinned A"), b = await task("Pinned B");
     const before = await one("select priority, updated_at from public.assistant_tasks where object_id=$1", [a.object_id]);
@@ -131,7 +157,7 @@ test("Classification and Attention PostgreSQL contracts", async t => {
     const functionNames = [
       "assistant_create_category", "assistant_update_category", "assistant_archive_category", "assistant_create_tag", "assistant_update_tag", "assistant_archive_tag",
       "assistant_set_object_category", "assistant_clear_object_category", "assistant_add_object_tag", "assistant_remove_object_tag", "assistant_get_object_classification",
-      "assistant_list_category_members", "assistant_list_tag_members", "assistant_pin_object", "assistant_unpin_object", "assistant_is_object_pinned", "assistant_list_pinned_objects",
+      "assistant_list_categories", "assistant_list_tags", "assistant_list_category_members", "assistant_list_tag_members", "assistant_pin_object", "assistant_unpin_object", "assistant_is_object_pinned", "assistant_list_pinned_objects",
     ];
     const funcs = await rows("select proname,prosecdef from pg_proc where proname=any($1::text[])", [functionNames]);
     assert.equal(funcs.length, functionNames.length);
