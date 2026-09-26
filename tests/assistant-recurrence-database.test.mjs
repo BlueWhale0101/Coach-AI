@@ -67,6 +67,9 @@ test("Recurrence PostgreSQL contract", async t => {
     const weeklyDates = [];
     for (let i = 1; i <= 6; i++) weeklyDates.push(day((await calendar(weekly.object_id, i)).occurrence_date));
     assert.deepEqual(weeklyDates, ["2026-09-30", "2026-10-02", "2026-10-12", "2026-10-14", "2026-10-16", "2026-10-26"]);
+    const cleared = await one("select * from public.assistant_update_recurrence($1,$2::jsonb)", [weekly.object_id, '{"weekdays":null}']);
+    assert.equal(cleared.weekdays, null);
+    assert.equal(day((await calendar(weekly.object_id, 1)).occurrence_date), "2026-10-12");
     const weeklySingle = await make({ frequency: "weekly", interval: 2, date: "2026-09-28" });
     assert.equal(day((await calendar(weeklySingle.object_id, 1)).occurrence_date), "2026-10-12");
     for (const days of [[], [0], [8], [1, 1], [2]]) {

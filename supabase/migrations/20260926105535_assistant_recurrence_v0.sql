@@ -258,7 +258,11 @@ begin
     set frequency = case when p_patch ? 'frequency' then p_patch->>'frequency' else frequency end,
         interval_count = case when p_patch ? 'interval_count' then (p_patch->>'interval_count')::integer else interval_count end,
         timezone = case when p_patch ? 'timezone' then p_patch->>'timezone' else timezone end,
-        weekdays = case when p_patch ? 'weekdays' then array(select jsonb_array_elements_text(p_patch->'weekdays')::smallint) else weekdays end
+        weekdays = case
+          when p_patch ? 'weekdays' and jsonb_typeof(p_patch->'weekdays') = 'null' then null
+          when p_patch ? 'weekdays' then array(select jsonb_array_elements_text(p_patch->'weekdays')::smallint)
+          else weekdays
+        end
     where object_id = p_object_id and status = 'active' returning *;
   if not found then
     if exists (select 1 from public.assistant_recurrences where object_id = p_object_id) then
