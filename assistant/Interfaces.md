@@ -295,3 +295,108 @@ validation, and invoker capability RPCs. Registry and event creation are one
 transaction. RLS is enabled with no direct anon/authenticated table access;
 only the service role has the required table and RPC privileges. Existing
 Tasks, Knowledge, Reminders, and Coach contracts are unchanged.
+
+---
+
+# Assistant.AI Recurrence API — V0
+
+The eight `POST` Edge Functions accept `OPTIONS` for CORS and the established
+`X-Action-Secret: <ACTION_API_SECRET>` header (Bearer fallback). Responses use
+`{ "ok": true, "data": ... }` or a safe `{ "ok": false, "code": ...,
+"error": ..., "details": ... }` envelope. All are configured with
+`verify_jwt = false`; only their server-side service-role client accesses
+Recurrence. Timestamps require an explicit `Z` or UTC offset; dates are
+`YYYY-MM-DD`. No natural-language parsing is performed.
+
+| Function | Request | Response data |
+| --- | --- | --- |
+| `create-recurrence` | `seed_object_id`, `basis`, `frequency`, `interval_count`, complete anchor and seed position | `{ "recurrence": Recurrence }` |
+| `update-recurrence` | `object_id` and one or more of `frequency`, `interval_count`, `timezone`, `weekdays` | `{ "recurrence": Recurrence }` |
+| `end-recurrence` | `object_id` | `{ "recurrence": Recurrence }` |
+| `get-recurrence` | `object_id` | `{ "recurrence": Recurrence }` |
+| `list-recurrences` | Optional `status`, `seed_object_id`, `basis`, `limit`, `offset` | `{ "recurrences": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
+| `list-due-recurrence-occurrences` | Inclusive `from_at`/`through_at` and/or `from_date`/`through_date`; optional `limit`, `offset` | `{ "occurrences": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
+| `next-after-completion` | `object_id`, recorded `completed_object_id`, actual `completed_at` | `{ "occurrence": OccurrenceDescriptor \| null }` |
+| `record-recurrence-occurrence` | `object_id`, `sequence` (>= 1), exactly one `occurrence_at` or `occurrence_date`, `generated_object_id`; for completion-relative also `completed_object_id`, `completed_at` | `{ "occurrence": LedgerEntry }` |
+
+The returned `Recurrence` has `object_id`, `seed_object_id`, `basis` (`calendar`
+or `after_completion`), `frequency` (`daily`, `weekly`, `monthly`, `yearly`),
+positive `interval_count`, nullable `anchor_kind`, `anchor_at`, `anchor_date`,
+`timezone`, `weekdays`, `status` (`active` or `ended`), `ended_at`, `created_at`,
+and `updated_at`. The seed must be a registered Task or Schedule Event. The
+caller supplies its position; Recurrence only checks registry type and does
+not inspect the owning module's private representation.
+
+`create-recurrence` accepts three complete shapes:
+
+- Calendar instant: `anchor_kind: "instant"`, `anchor_at`, validated PostgreSQL
+  `timezone`, and `seed_occurrence_at` equal to `anchor_at`; no date fields.
+- Calendar date: `anchor_kind: "date"`, `anchor_date`, and
+  `seed_occurrence_date` equal to `anchor_date`; no timezone or instant fields.
+- Completion-relative: Task seed only; `timezone`, `seed_occurrence_at`;
+  no fixed anchor, weekday selection, or date fields.
+
+Weekly calendar rules may supply a nonempty set of unique ISO `weekdays`
+(Monday=1, Sunday=7). The anchor must fall on a selected weekday. Sequence 0
+is the seed, followed by later selected weekdays in the same anchor ISO week,
+then selected weekdays in every Nth later ISO week. Weekly rules without a
+selection move N local calendar weeks from the original anchor. Daily and
+weekly intervals are calendar days/weeks, not fixed seconds. Monthly
+occurrences clamp the original anchor day to the target month end, then
+recover that day in longer months. February 29 yearly recurrences use
+February 28 in non-leap years and recover February 29 in leap years.
+
+Instant rules preserve the original anchor's local wall clock. PostgreSQL
+`AT TIME ZONE` resolves nonexistent spring wall times with the
+pre-transition standard offset (New York 2026-03-08 02:30 -> 07:30Z,
+displayed as 03:30 EDT) and ambiguous fall wall times with standard time
+(New York 2026-11-01 01:30 -> 06:30Z). Subsequent occurrences return to
+the original local clock time. Completion-relative rules calculate from the
+supplied actual completion instant in the named timezone; weekly means N
+local calendar weeks after completion, without weekday selections.
+
+An `OccurrenceDescriptor` contains `recurrence_object_id`, `seed_object_id`,
+`sequence`, and exactly one populated `occurrence_at` (instant) or
+`occurrence_date` (date). Due listing only returns missing positions of
+active calendar rules within caller-supplied inclusive bounds. Instant/date
+windows remain distinct; supplying both selects both kinds. Order is
+`recurrence_object_id ASC, sequence ASC`. Each rule scans at most 10,000
+candidate positions per call; a wider horizon fails explicitly instead of
+truncating. Pagination defaults to limit 50, offset 0, with maximum limit
+100 and offset 10,000; an extra row determines `has_more`.
+
+`next-after-completion` requires a recorded series member, uses the supplied
+completion instant, and returns its next missing descriptor. It returns
+`null` after a successor has been recorded. Recurrence cannot independently
+check Task completion; the caller invokes this after successful Task
+completion. The caller then creates the next Task through Tasks and records
+the returned descriptor with its generated registry ID, predecessor ID, and
+the same completion instant. Recording validates sequence and position and
+returns an existing entry for an identical retry. A different generated
+object for the same sequence/position or one already in another series
+raises `OCCURRENCE_CONFLICT` (409).
+
+The seed/basis/anchor stay fixed on update. Once any generated member is
+recorded, temporal rule changes are rejected to preserve all historical
+positions; identical patches remain possible. Ending is terminal and stops
+new calculations/recordings, without changing concrete Tasks or Events.
+Ledger history is immutable.
+
+Concrete creation and ledger recording cross module/API transactions. If
+creation succeeds and recording fails, the caller must inspect or reconcile
+the concrete object through its owning module's public get/list interface
+and attach it, or surface the ambiguity. It must not blindly create a
+replacement. The ledger is idempotent after successful recording but does
+not promise exactly-once concrete creation. No worker, queue, cron, or
+private-table recovery mechanism is included.
+
+Errors include `UNAUTHORIZED`, `INVALID_JSON`, `INVALID_OBJECT_ID`,
+`INVALID_TIMESTAMP`, `INVALID_DATE`, `INVALID_TIME_WINDOW`,
+`INVALID_PAGINATION`, `INVALID_TIMEZONE`, `MISSING_REQUIRED_FIELD`,
+`IMMUTABLE_FIELD`, `VALIDATION_ERROR`, `RECURRENCE_NOT_FOUND` (404),
+`INVALID_TRANSITION` (409), `OCCURRENCE_CONFLICT` (409), and safe
+`DATABASE_ERROR` (500). Forward migration
+`20260926105535_assistant_recurrence_v0.sql` adds only Recurrence-owned
+tables/indexes/triggers/functions and a registry type guard. RLS is on;
+anonymous/authenticated roles have no table or RPC privileges; Recurrence
+capabilities are `SECURITY INVOKER` and service-role-only.
