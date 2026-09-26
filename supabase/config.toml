@@ -1,0 +1,43 @@
+# Supabase project configuration used by the GitHub integration.
+# Assistant Edge Functions use ACTION_API_SECRET authentication in their handlers,
+# so Supabase JWT verification is intentionally disabled for these endpoints.
+
+[functions.create-task]
+verify_jwt = false
+
+[functions.update-task]
+verify_jwt = false
+
+[functions.complete-task]
+verify_jwt = false
+
+[functions.cancel-task]
+verify_jwt = false
+
+[functions.get-task]
+verify_jwt = false
+
+[functions.list-tasks]
+verify_jwt = false
+
+[functions.search-tasks]
+verify_jwt = false
+
+[functions.create-knowledge]
+verify_jwt = false
+
+[functions.update-knowledge]
+verify_jwt = false
+
+[functions.archive-knowledge]
+verify_jwt = false
+
+[functions.get-knowledge]
+verify_jwt = false
+
+[functions.list-knowledge]
+verify_jwt = false
+
+[functions.search-knowledge]
+verify_jwt = false
+
