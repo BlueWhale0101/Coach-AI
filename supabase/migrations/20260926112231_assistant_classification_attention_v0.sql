@@ -343,24 +343,6 @@ begin
 end;
 $$;
 
-create function public.assistant_list_categories(p_status text default null, p_limit integer default 50, p_offset integer default 0)
-returns setof public.assistant_categories
-language sql stable security invoker set search_path = public as $$
-  select c.* from public.assistant_categories c
-  where p_status is null or c.status = p_status
-  order by c.sort_order asc, lower(c.name) asc, c.object_id asc
-  limit least(greatest(p_limit, 0), 101) offset greatest(p_offset, 0);
-$$;
-
-create function public.assistant_list_tags(p_status text default null, p_limit integer default 50, p_offset integer default 0)
-returns setof public.assistant_tags
-language sql stable security invoker set search_path = public as $$
-  select t.* from public.assistant_tags t
-  where p_status is null or t.status = p_status
-  order by lower(t.name) asc, t.object_id asc
-  limit least(greatest(p_limit, 0), 101) offset greatest(p_offset, 0);
-$$;
-
 create function public.assistant_list_category_members(p_category_object_id uuid, p_limit integer default 50, p_offset integer default 0)
 returns table(target_object_id uuid, assigned_at timestamptz)
 language sql stable security invoker set search_path = public as $$
@@ -444,8 +426,6 @@ revoke all on function public.assistant_clear_object_category(uuid) from public,
 revoke all on function public.assistant_add_object_tag(uuid,uuid) from public, anon, authenticated;
 revoke all on function public.assistant_remove_object_tag(uuid,uuid) from public, anon, authenticated;
 revoke all on function public.assistant_get_object_classification(uuid) from public, anon, authenticated;
-revoke all on function public.assistant_list_categories(text,integer,integer) from public, anon, authenticated;
-revoke all on function public.assistant_list_tags(text,integer,integer) from public, anon, authenticated;
 revoke all on function public.assistant_list_category_members(uuid,integer,integer) from public, anon, authenticated;
 revoke all on function public.assistant_list_tag_members(uuid,integer,integer) from public, anon, authenticated;
 revoke all on function public.assistant_pin_object(uuid) from public, anon, authenticated;
@@ -464,8 +444,6 @@ grant execute on function public.assistant_clear_object_category(uuid) to servic
 grant execute on function public.assistant_add_object_tag(uuid,uuid) to service_role;
 grant execute on function public.assistant_remove_object_tag(uuid,uuid) to service_role;
 grant execute on function public.assistant_get_object_classification(uuid) to service_role;
-grant execute on function public.assistant_list_categories(text,integer,integer) to service_role;
-grant execute on function public.assistant_list_tags(text,integer,integer) to service_role;
 grant execute on function public.assistant_list_category_members(uuid,integer,integer) to service_role;
 grant execute on function public.assistant_list_tag_members(uuid,integer,integer) to service_role;
 grant execute on function public.assistant_pin_object(uuid) to service_role;
