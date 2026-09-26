@@ -60,3 +60,21 @@ Consequences:
 - No Gmail/chat/source-specific IDs in assistant_tasks.
 - Assignee support is deferred until an Entity/People identity capability exists.
 - Task completion and cancellation are semantic operations, not arbitrary status-field mutations.
+
+
+## 2026-09-26 — Treat GitHub Merge as the Supabase Deployment Gate
+Status: accepted
+
+Decision:
+The shared Supabase project is connected to this GitHub repository. For deployment-managed Supabase definitions, merge to the deployment branch may cause production deployment automatically. PR review is therefore the primary pre-deployment gate.
+
+Production schema changes must be represented by append-only forward migrations. Once a migration has been applied to Supabase, later changes must not be represented only by editing that historical migration.
+
+Reason:
+Tasks V0 exposed both behaviors: its Edge Functions deployed through the GitHub integration before a manual deployment was attempted, and the initial Tasks migration had already been applied before its RPC security mode was changed in source. A second live migration was required to bring production to the intended state.
+
+Consequences:
+- Supabase-affecting PRs are production-affecting changes.
+- Codex and other implementation agents must not describe merge and deploy as necessarily separate steps.
+- Applied migrations are immutable history; corrections use new migrations.
+- Post-merge verification should compare live Supabase state with repository intent.
