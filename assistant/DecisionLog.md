@@ -78,3 +78,23 @@ Consequences:
 - Codex and other implementation agents must not describe merge and deploy as necessarily separate steps.
 - Applied migrations are immutable history; corrections use new migrations.
 - Post-merge verification should compare live Supabase state with repository intent.
+
+
+## 2026-09-26 — Knowledge V0 Owns Durable Reference Information
+Status: accepted
+
+Decision:
+The Knowledge module represents coherent pieces of durable human-readable reference information. V0 stores a required title and textual content and has a minimal active/archived lifecycle.
+
+Knowledge search is a module capability whose retrieval mechanics are private. V0 may use simple textual matching without making substring behavior part of the contract.
+
+Reason:
+Assistant needs a durable answer to “remember this” that is distinct from actionable Tasks. Keeping provenance, reminders, recurrence, entities, taxonomy, and retrieval technology outside the representation allows those decisions to evolve independently.
+
+Consequences:
+- Knowledge objects use the Object Registry with `object_type = 'knowledge'`.
+- Title and content are required and nonblank.
+- Active items may be treated as current reference information; archived items are retained but not normally current.
+- Generic update changes title/content only; archiving is a semantic operation.
+- V0 has no unarchive or public delete operation.
+- Knowledge contains no source-specific provenance, tags/categories, entities, reminders, recurrence, embeddings, arbitrary JSON metadata, or scheduling semantics.
