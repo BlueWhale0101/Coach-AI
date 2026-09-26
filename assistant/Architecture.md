@@ -46,6 +46,26 @@ A module must not directly manipulate another module's private representation. C
 
 Physical co-location in one database or Edge Function deployment does not remove the logical boundary.
 
+## Execution model
+
+Assistant.AI deliberately has no continuously running agent or orchestration loop.
+
+Durable truth lives in Supabase. Interactive chat and UI operations write state synchronously through module interfaces. UIs may react to Supabase change/realtime signals for prompt display updates.
+
+External systems and derived state are reconciled periodically by scheduled ChatGPT tasks rather than by a custom always-on worker. A typical household cadence may run several times per day, with an important early-morning reconciliation before the household wakes. Immediate freshness remains available by asking the interactive agent to reconcile on demand.
+
+The architecture therefore accepts **bounded staleness**—usually hours—for external sources in exchange for substantially lower infrastructure and orchestration complexity.
+
+Periodic reconciliation must be designed around:
+- idempotent operations;
+- checkpoints that advance only after successful processing;
+- lightweight provenance/auditability for inferred changes;
+- explicit conflict policy at external-system adapter boundaries.
+
+Precise notification deadlines are a separate concern: a reminder that must surface at an exact time may use an existing scheduled ChatGPT/notification facility without introducing a general continuous backend loop.
+
+Do not introduce queues, background workers, webhook infrastructure, custom LLM orchestration services, or backend cron merely to reduce ordinary household-state staleness unless a demonstrated requirement justifies them.
+
 ## Development model
 
 The repository is the durable source of architectural intent.
