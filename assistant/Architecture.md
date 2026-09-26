@@ -35,6 +35,8 @@ No interface owns the data model.
 - Scheduling: things situated in time.
 - Recurrence: repeating rules and occurrence generation.
 - Reminders: conditions under which an object should surface.
+- Classification: primary categories, colors, and flexible tags across registered objects.
+- Attention: explicit user-selected prominence/pinning across registered objects.
 - Capture: transformation of external input into operations on durable modules.
 - Entities: durable identity for people/places/things; deferred until demonstrated need.
 

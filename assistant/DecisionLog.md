@@ -163,3 +163,38 @@ Consequences:
 - Recurrence never directly reads/writes another module's private tables to clone an occurrence.
 - Ending a recurrence does not mutate already-materialized objects.
 - Full RRULE compatibility, advanced positional rules, holiday calendars, provider recurrence IDs, and reminder delivery are deferred.
+
+## 2026-09-26 — Classification Separates Primary Category from Tags
+
+**Status:** Accepted
+
+Classification owns cross-object organization without adding taxonomy fields to substantive modules.
+
+Each registered target may have zero or one primary Category. Categories provide the stable organizational identity and color used by UI projections. Targets may additionally have zero or many Tags for flexible grouping and filtering.
+
+Categories and Tags are durable registry objects. Their assignment rows are Classification-private relationships and are not registry objects.
+
+Archiving is terminal in V0, prevents new assignments, and preserves existing assignments so classification does not disappear from historical/current objects.
+
+Consequences:
+- Tasks, Knowledge, Scheduling, and other modules do not gain category/tag columns.
+- Multiple primary categories are deliberately unsupported; use Tags for many-to-many grouping.
+- Category color has one canonical Classification-owned representation.
+- Classification member queries expose target registry identities rather than another module's private fields.
+
+
+## 2026-09-26 — Attention Owns Explicit Prominence, Not Priority
+
+**Status:** Accepted
+
+Attention represents the user's explicit choice to keep a registered object prominent, initially as a binary pin/bump state.
+
+A pin is not a substantive Assistant object and receives no registry identity. It references an existing registry object and records when it was pinned.
+
+Task priority and Attention are separate concepts. High priority does not imply pinned, and pinned does not imply high priority.
+
+Consequences:
+- Attention does not modify Task priority or other target state.
+- Pin/unpin is available across registered object types without depending on their private representation.
+- V0 has no ranking, expiration, reason, automatic pinning, or multiple attention levels.
+- The Today/dashboard UI can compose Attention with Tasks, Scheduling, and Classification rather than owning dashboard-specific durable state.
