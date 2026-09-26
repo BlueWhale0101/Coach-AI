@@ -124,3 +124,42 @@ Timed events preserve both absolute start/end instants and a validated IANA/Post
 Schedule events have a `scheduled -> cancelled` lifecycle; there is no completed state. Rescheduling preserves event identity, and scheduled events may atomically convert between complete timed and all-day representations.
 
 Recurrence, reminders, natural-language time parsing, location/entities, attendees, provider-specific calendar IDs, and external synchronization are deliberately outside Scheduling V0.
+
+## 2026-09-26 — Prefer Periodic Reconciliation Over a Continuous Agent Loop
+
+**Status:** Accepted
+
+Assistant.AI will not maintain a continuously running agent or general orchestration worker. Supabase is durable truth; interactive chat/UI changes are written synchronously and may propagate to UIs through Supabase change/realtime mechanisms.
+
+External sources such as Google Calendar and Gmail will normally be reconciled by scheduled ChatGPT tasks several times per day, with an important early-morning refresh. Interactive chat may request an immediate reconciliation when freshness matters.
+
+The system deliberately accepts bounded external-state staleness, typically measured in hours, because household state changes slowly and the operational value of second-level freshness is low.
+
+Consequences:
+- Scheduled reconciliation must be idempotent and checkpointed.
+- Checkpoints advance only after successful processing.
+- External adapters need explicit conflict policy and useful provenance/audit information.
+- Precise reminder delivery may use an existing exact scheduling/notification facility without creating a general continuous loop.
+- Queues, custom background workers, webhooks, backend cron, and custom LLM orchestration are not default architecture; they require a demonstrated need.
+- LLM reasoning should perform semantic interpretation; deterministic Assistant module interfaces and PostgreSQL constraints protect durable state.
+
+
+## 2026-09-26 — Recurrence V0 Owns Repeating Rules and Occurrence Identity
+
+**Status:** Accepted
+
+Recurrence owns repeating-rule semantics, calendar arithmetic, and the ledger of concrete objects already materialized for a series. It does not own or clone the private representation of Tasks or Schedule Events.
+
+V0 supports calendar-anchored and completion-relative recurrence. Frequencies are daily, weekly, monthly, and yearly with positive intervals; weekly calendar rules may select ISO weekdays. Calendar recurrence distinguishes instant/timezone anchors from date-only anchors and uses human calendar arithmetic rather than fixed-second approximations.
+
+Each recurrence is a registered object and begins from an existing Task or Schedule Event seed. Its occurrence ledger records the seed and later generated objects, providing idempotence when periodic reconciliation runs late or repeatedly.
+
+Completion-relative recurrence is Task-only in V0 and calculates the next occurrence from actual completion time. Calendar recurrence can be queried for missing occurrences within explicit bounded horizons.
+
+Consequences:
+- Recurrence has no continuously running worker.
+- Scheduled ChatGPT reconciliation or interactive orchestration asks Recurrence what occurrences are missing.
+- The orchestrator creates concrete Tasks/Events through their owning module interfaces and then records them with Recurrence.
+- Recurrence never directly reads/writes another module's private tables to clone an occurrence.
+- Ending a recurrence does not mutate already-materialized objects.
+- Full RRULE compatibility, advanced positional rules, holiday calendars, provider recurrence IDs, and reminder delivery are deferred.
