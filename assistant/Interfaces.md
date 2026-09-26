@@ -114,3 +114,55 @@ authentication.
 The database constraints are the final enforcement layer for status, priority,
 terminal timestamps, nonblank titles, and action-window ordering. The API also
 validates these rules to provide stable errors before attempting persistence.
+
+---
+
+# Assistant.AI Knowledge API — V0
+
+The Knowledge capability is separate from Tasks and Coach. Each operation is a
+Supabase Edge Function with a hyphenated name, accepts `POST` JSON and `OPTIONS`
+preflight, and uses the same `X-Action-Secret` header (or `Authorization: Bearer`
+fallback) and `{ "ok": true, "data": ... }` / `{ "ok": false, "error": ..., "code": ..., "details": ... }`
+envelopes described above. The service role is held only in the Edge Function.
+
+Returned Knowledge items have stable `object_id`, nonblank `title` and `content`,
+`status` (`active` or `archived`), nullable `archived_at`, and `created_at` and
+`updated_at` timestamps. Callers do not create or mutate registry rows directly.
+
+| Function | Request | Response data |
+| --- | --- | --- |
+| `create-knowledge` | Required `title`, `content` | `{ "knowledge": Knowledge }` |
+| `update-knowledge` | `object_id`, at least one of `title`, `content` | `{ "knowledge": Knowledge }` |
+| `archive-knowledge` | `object_id` | `{ "knowledge": Knowledge }` |
+| `get-knowledge` | `object_id` | `{ "knowledge": Knowledge }` |
+| `list-knowledge` | Optional `status`, `limit`, `offset` | Page described below |
+| `search-knowledge` | Required nonblank `query`; optional `status`, `limit`, `offset` | Page described below |
+
+`update-knowledge` changes title/content on active items only. The archive
+operation changes an active item to archived and records `archived_at` atomically.
+There is no unarchive or delete operation. Missing items return
+`KNOWLEDGE_NOT_FOUND` (404); archived-item transitions return
+`INVALID_TRANSITION` (409). Other validation codes include
+`MISSING_REQUIRED_FIELD`, `VALIDATION_ERROR`, `INVALID_OBJECT_ID`,
+`IMMUTABLE_FIELD`, and `INVALID_PAGINATION`; unauthorized calls return
+`UNAUTHORIZED` (401). Internal database errors are not exposed to callers.
+
+List and search return:
+
+```json
+{ "knowledge": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }
+```
+
+Limit defaults to 50 and cannot exceed 100; offset defaults to zero. The
+results are ordered by creation time descending, then object ID ascending.
+The server reads one extra row to determine `has_more`. Search V0 matches
+case-insensitive text in titles and content; callers should depend on the
+search capability rather than a particular retrieval algorithm.
+
+The forward migration `20260926093922_assistant_knowledge_v0.sql` adds
+`assistant_knowledge`, type and timestamp protection triggers, local lifecycle
+constraints, and create/update/archive/search RPCs. The create RPC inserts the
+registry and Knowledge rows in one PostgreSQL transaction. All Knowledge RPCs
+are `SECURITY INVOKER`; the table has RLS enabled, no `anon` or `authenticated`
+table access, and explicit service-role privileges. The registry's open-ended
+object-type format and the existing Tasks and Coach contracts are unchanged.
