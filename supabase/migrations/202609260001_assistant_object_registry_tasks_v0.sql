@@ -97,7 +97,7 @@ create function public.assistant_create_task(
 )
 returns setof public.assistant_tasks
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -123,7 +123,7 @@ create function public.assistant_update_task(
 )
 returns setof public.assistant_tasks
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
@@ -157,7 +157,7 @@ $$;
 create function public.assistant_complete_task(p_object_id uuid)
 returns setof public.assistant_tasks
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
@@ -179,7 +179,7 @@ $$;
 create function public.assistant_cancel_task(p_object_id uuid)
 returns setof public.assistant_tasks
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
@@ -212,7 +212,7 @@ create function public.assistant_search_tasks(
 returns setof public.assistant_tasks
 language sql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
   select task.*
