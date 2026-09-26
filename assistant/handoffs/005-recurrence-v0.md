@@ -44,7 +44,7 @@ It must not read or write `assistant_tasks` or `assistant_schedule_events` priva
 
 The occurrence ledger is Recurrence-owned.
 
-Assistant has no continuous orchestration loop. Periodic ChatGPT reconciliation and interactive chat will call these capabilities. Design for late/repeated calls and idempotence.
+Assistant has no continuous orchestration loop. Periodic ChatGPT reconciliation and interactive chat will call these capabilities. Design calculation and recording for late/repeated calls and idempotence. Do not claim exactly-once atomicity across a substantive-module create call followed by Recurrence recording; preserve the recovery boundary documented in Recurrence.md.
 
 ## Migration discipline
 
@@ -172,7 +172,7 @@ Ready for review when:
 - all tests pass;
 - migration is append-only;
 - recurrence math and DST behavior are explicit and tested;
-- occurrence materialization is idempotent;
+- recorded occurrence calculation/recording is idempotent and the cross-module partial-failure boundary is explicit;
 - no cross-module private-table manipulation was introduced;
 - API/docs agree;
 - all eight functions are registered;
