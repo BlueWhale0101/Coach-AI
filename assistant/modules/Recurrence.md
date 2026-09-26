@@ -52,7 +52,7 @@ A recurrence has one `seed_object_id`: the existing registered object from which
 
 The seed remains owned by its substantive module. Recurrence may inspect registry type but must not read or mutate the seed module's private table.
 
-The occurrence ledger records both the seed and later generated objects as members of the series. A concrete object may belong to at most one active V0 recurrence series.
+The occurrence ledger records both the seed and later generated objects as members of the series. A concrete object may belong to at most one V0 recurrence series.
 
 ## V0 representation
 
@@ -182,7 +182,9 @@ complete Task occurrence
 
 The orchestrator may copy appropriate human-facing properties through the owning module's public get/create interfaces. Recurrence itself must not clone Tasks or Scheduling tables.
 
-If concrete-object creation succeeds but occurrence recording fails, a later reconciliation must be able to detect/reconcile the partial operation. Do not solve this by coupling Recurrence directly to another module's private tables.
+Concrete-object creation and occurrence recording cross module/API boundaries and are not claimed to be exactly-once atomic in V0. The occurrence ledger prevents duplication once an occurrence is recorded, but there is a small partial-failure window if object creation succeeds and recording does not.
+
+A caller that has an uncertain create/record outcome must not blindly create another object for the same occurrence. It should inspect/reconcile the owning module through its public interfaces and either attach the already-created object or surface the ambiguity for resolution. Do not solve this by coupling Recurrence directly to another module's private tables. If this recovery case becomes operationally significant, add a dedicated orchestration/idempotency mechanism as a separate design decision.
 
 ## Materialization horizon
 
@@ -287,7 +289,7 @@ It validates:
 - RC15. Each generated object belongs to at most one V0 recurrence series.
 - RC16. A recurrence occurrence position cannot materialize two different objects.
 - RC17. Recurrence never directly mutates Tasks, Scheduling, Reminders, or Knowledge private state.
-- RC18. Periodic reconciliation may run late or more than once without duplicating materialized occurrences.
+- RC18. Repeated calculation/recording of already-recorded occurrences is idempotent; callers must explicitly reconcile uncertain cross-module create/record outcomes rather than blindly recreating them.
 - RC19. Rule calculation uses calendar semantics, not fixed-second approximations for days/weeks/months/years.
 - RC20. No continuous worker is required for correctness.
 
