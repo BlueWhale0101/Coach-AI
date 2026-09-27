@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { expectedToolSequenceByGoldenCase } from "../assistant/mcp/adapters.mjs";
+import { expectedToolSequenceByBehavioralFixture } from "../assistant/mcp/adapters.mjs";
 
-test("golden conversational cases encode intended Assistant.AI tool selection", () => {
-  const cases = expectedToolSequenceByGoldenCase();
+test("golden behavioral specifications encode intended Assistant.AI tool selection", () => {
+  const cases = expectedToolSequenceByBehavioralFixture();
   assert.equal(cases.length, 15);
 
   const byCase = new Map(cases.map((entry) => [entry.case, entry]));

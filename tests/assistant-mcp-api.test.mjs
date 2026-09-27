@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { callAssistantTool } from "../assistant/mcp/adapters.mjs";
-import { handleMcpJsonRpc } from "../assistant/mcp/server.mjs";
+import { AssistantMcpError } from "../assistant/mcp/edge-client.mjs";
+import { createAssistantMcpServer, SERVER_INSTRUCTIONS } from "../assistant/mcp/server.mjs";
 import { TOOL_DEFINITIONS, TOOL_NAMES } from "../assistant/mcp/tool-definitions.mjs";
 
 const UUIDS = {
@@ -33,6 +36,20 @@ function fakeEdge(fixtures = {}) {
       return structuredClone(value);
     },
   };
+}
+
+async function withSdkClient(edge, run) {
+  const server = createAssistantMcpServer({ edge });
+  const client = new Client({ name: "assistant-ai-test-client", version: "0.0.0" }, { capabilities: {} });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    return await run(client);
+  } finally {
+    await client.close();
+    await server.close();
+  }
 }
 
 test("MCP tool vocabulary is bounded and annotated", () => {
@@ -111,21 +128,18 @@ test("category name resolution uses existing active category and unknown categor
 });
 
 test("set_tags replaces complete tag set and refuses partial mutation for unknown tags", async () => {
-  const edge = fakeEdge({
-    "get-object-classification": { classification: { target_object_id: UUIDS.task, tags: [{ object_id: UUIDS.tagOld, name: "old" }, { object_id: UUIDS.tagMoving, name: "moving" }] } },
-  });
+  const edge = fakeEdge();
 
   const result = await callAssistantTool(edge, "set_tags", { object_id: UUIDS.task, tags: ["house", "moving"] });
   assert.equal(result.ok, true);
   assert.deepEqual(edge.calls.map((call) => call.functionName), [
     "list-tags",
-    "get-object-classification",
-    "remove-object-tag",
-    "add-object-tag",
-    "get-object-classification",
+    "replace-object-tags",
   ]);
-  assert.deepEqual(edge.calls[2].body, { target_object_id: UUIDS.task, tag_object_id: UUIDS.tagOld });
-  assert.deepEqual(edge.calls[3].body, { target_object_id: UUIDS.task, tag_object_id: UUIDS.tagHouse });
+  assert.deepEqual(edge.calls[1].body, {
+    target_object_id: UUIDS.task,
+    tag_object_ids: [UUIDS.tagHouse, UUIDS.tagMoving],
+  });
 
   const unknownEdge = fakeEdge();
   const unknown = await callAssistantTool(unknownEdge, "set_tags", { object_id: UUIDS.task, tags: ["moving", "imaginary"] });
@@ -134,27 +148,36 @@ test("set_tags replaces complete tag set and refuses partial mutation for unknow
   assert.deepEqual(unknownEdge.calls.map((call) => call.functionName), ["list-tags"]);
 });
 
-test("MCP JSON-RPC lists and calls tools with structured agent-readable results", async () => {
+test("set_tags delegates rollback of backend failures to the atomic Classification capability", async () => {
+  const edge = fakeEdge({
+    "replace-object-tags": () => {
+      throw new AssistantMcpError("TAG_NOT_FOUND", "tag not found", 404);
+    },
+  });
+
+  const result = await callAssistantTool(edge, "set_tags", { object_id: UUIDS.task, tags: ["house"] });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "TAG_NOT_FOUND");
+  assert.deepEqual(edge.calls.map((call) => call.functionName), ["list-tags", "replace-object-tags"]);
+});
+
+test("MCP SDK server lists and calls tools with structured agent-readable results", async () => {
   const edge = fakeEdge({
     "get-household-board": { board: { metadata: { timezone: "Australia/Darwin" }, tasks: [], days: [] } },
   });
 
-  const init = await handleMcpJsonRpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, { edge });
-  assert.equal(init.result.serverInfo.name, "assistant-ai-mcp");
-  assert.match(init.result.instructions, /Search before mutating/);
+  await withSdkClient(edge, async (client) => {
+    assert.equal(client.getServerVersion().name, "assistant-ai-mcp");
+    assert.equal(client.getInstructions(), SERVER_INSTRUCTIONS);
 
-  const listed = await handleMcpJsonRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, { edge });
-  assert.equal(listed.result.tools.length, TOOL_NAMES.length);
+    const listed = await client.listTools();
+    assert.equal(listed.tools.length, TOOL_NAMES.length);
 
-  const called = await handleMcpJsonRpc({
-    jsonrpc: "2.0",
-    id: 3,
-    method: "tools/call",
-    params: { name: "get_household_board", arguments: { timezone: "Australia/Darwin" } },
-  }, { edge });
-  assert.equal(called.result.structuredContent.ok, true);
-  assert.equal(called.result.content[0].type, "text");
-  assert.deepEqual(edge.calls[0], { functionName: "get-household-board", body: { timezone: "Australia/Darwin" } });
+    const called = await client.callTool({ name: "get_household_board", arguments: { timezone: "Australia/Darwin" } });
+    assert.equal(called.structuredContent.ok, true);
+    assert.equal(called.content[0].type, "text");
+    assert.deepEqual(edge.calls[0], { functionName: "get-household-board", body: { timezone: "Australia/Darwin" } });
+  });
 });
 
 test("MCP adapter never maps tools to Coach or direct SQL surfaces", async () => {

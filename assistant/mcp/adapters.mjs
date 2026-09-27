@@ -137,29 +137,16 @@ async function setTags(edge, args) {
     };
   }
 
-  const current = await edge.call("get-object-classification", { target_object_id: args.object_id });
-  const currentTags = current.classification?.tags || [];
-  const wantedIds = new Set(desired.map((entry) => entry.tag.object_id));
-  const currentIds = new Set(currentTags.map((tag) => tag.object_id));
-
-  for (const tag of currentTags) {
-    if (!wantedIds.has(tag.object_id)) {
-      await edge.call("remove-object-tag", { target_object_id: args.object_id, tag_object_id: tag.object_id });
-    }
-  }
-  for (const entry of desired) {
-    if (!currentIds.has(entry.tag.object_id)) {
-      await edge.call("add-object-tag", { target_object_id: args.object_id, tag_object_id: entry.tag.object_id });
-    }
-  }
-
   return success(
-    await edge.call("get-object-classification", { target_object_id: args.object_id }),
+    await edge.call("replace-object-tags", {
+      target_object_id: args.object_id,
+      tag_object_ids: desired.map((entry) => entry.tag.object_id),
+    }),
     `Tags replaced with ${desiredNames.join(", ") || "no tags"}`,
   );
 }
 
-export function expectedToolSequenceByGoldenCase() {
+export function expectedToolSequenceByBehavioralFixture() {
   return [
     { case: 1, prompt: "Add do the dishes.", expected_tools: ["create_task"], notes: "No due date invented." },
     { case: 2, prompt: "Actually make that every night.", expected_tools: ["set_recurrence"], notes: "Use prior task identity; no duplicate task." },

@@ -1,4 +1,7 @@
 import { createServer } from "node:http";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
 import { createEdgeFunctionClient } from "./edge-client.mjs";
 import { callAssistantTool } from "./adapters.mjs";
 import { TOOL_DEFINITIONS } from "./tool-definitions.mjs";
@@ -7,67 +10,62 @@ export const SERVER_INFO = { name: "assistant-ai-mcp", version: "0.1.0" };
 export const SERVER_INSTRUCTIONS =
   "Assistant.AI tools present household state capabilities. Search before mutating when object identity is unknown. Writes require stable object_id values. Do not invent due dates for reminders or board surfacing.";
 
-function jsonResponse(id, result) {
-  return { jsonrpc: "2.0", id: id ?? null, result };
-}
-
-function jsonError(id, code, message, data = {}) {
-  return { jsonrpc: "2.0", id: id ?? null, error: { code, message, data } };
-}
-
 function textFor(result) {
   if (result.ok === false) return `${result.code}: ${result.error}`;
   return result.summary || "Assistant.AI operation completed";
 }
 
-export async function handleMcpJsonRpc(message, { edge } = {}) {
-  const request = Array.isArray(message) ? message : [message];
-  const responses = [];
-  for (const item of request) {
-    if (!item || item.jsonrpc !== "2.0" || typeof item.method !== "string") {
-      responses.push(jsonError(item?.id, -32600, "Invalid JSON-RPC request"));
-      continue;
-    }
+function hasType(schema, type) {
+  return Array.isArray(schema?.type) ? schema.type.includes(type) : schema?.type === type;
+}
 
-    if (item.method === "initialize") {
-      responses.push(jsonResponse(item.id, {
-        protocolVersion: item.params?.protocolVersion || "2025-06-18",
-        capabilities: { tools: { listChanged: false } },
-        serverInfo: SERVER_INFO,
-        instructions: SERVER_INSTRUCTIONS,
-      }));
-      continue;
-    }
+function zodForProperty(schema) {
+  let value;
+  if (hasType(schema, "array")) {
+    value = z.array(zodForProperty(schema.items || {}));
+  } else if (hasType(schema, "integer")) {
+    value = z.number().int();
+    if (Number.isFinite(schema.minimum)) value = value.min(schema.minimum);
+    if (Number.isFinite(schema.maximum)) value = value.max(schema.maximum);
+  } else if (hasType(schema, "number")) {
+    value = z.number();
+  } else if (hasType(schema, "boolean")) {
+    value = z.boolean();
+  } else {
+    value = z.string();
+  }
 
-    if (item.method === "tools/list") {
-      responses.push(jsonResponse(item.id, { tools: TOOL_DEFINITIONS }));
-      continue;
-    }
+  if (schema?.description) value = value.describe(schema.description);
+  if (hasType(schema, "null")) value = value.nullable();
+  return value;
+}
 
-    if (item.method === "tools/call") {
-      const name = item.params?.name;
-      const args = item.params?.arguments ?? {};
-      const result = await callAssistantTool(edge, name, args);
-      responses.push(jsonResponse(item.id, {
+function inputShape(jsonSchema) {
+  const required = new Set(jsonSchema.required || []);
+  return Object.fromEntries(Object.entries(jsonSchema.properties || {}).map(([name, schema]) => {
+    const value = zodForProperty(schema);
+    return [name, required.has(name) ? value : value.optional()];
+  }));
+}
+
+export function createAssistantMcpServer({ edge = createEdgeFunctionClient() } = {}) {
+  const server = new McpServer(SERVER_INFO, { instructions: SERVER_INSTRUCTIONS });
+  for (const tool of TOOL_DEFINITIONS) {
+    server.registerTool(tool.name, {
+      title: tool.title,
+      description: tool.description,
+      inputSchema: inputShape(tool.inputSchema),
+      annotations: tool.annotations,
+    }, async (args) => {
+      const result = await callAssistantTool(edge, tool.name, args);
+      return {
         structuredContent: result,
         content: [{ type: "text", text: textFor(result) }],
         isError: result.ok === false,
-      }));
-      continue;
-    }
-
-    if (item.method === "notifications/initialized") continue;
-    responses.push(jsonError(item.id, -32601, `Unsupported MCP method: ${item.method}`));
+      };
+    });
   }
-
-  if (Array.isArray(message)) return responses;
-  return responses[0] ?? null;
-}
-
-async function readBody(request) {
-  const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
-  return Buffer.concat(chunks).toString("utf8");
+  return server;
 }
 
 export function createAssistantMcpHttpServer({
@@ -81,7 +79,7 @@ export function createAssistantMcpHttpServer({
       return;
     }
 
-    if (request.method !== "POST" || !request.url?.startsWith("/mcp")) {
+    if (!request.url?.startsWith("/mcp")) {
       response.writeHead(404, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ ok: false, error: "Not found" }));
       return;
@@ -99,14 +97,19 @@ export function createAssistantMcpHttpServer({
       }
     }
 
+    const server = createAssistantMcpServer({ edge });
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    response.on("finish", async () => {
+      await server.close().catch(() => {});
+    });
     try {
-      const body = JSON.parse(await readBody(request));
-      const result = await handleMcpJsonRpc(body, { edge });
-      response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify(result));
-    } catch (error) {
-      response.writeHead(400, { "Content-Type": "application/json" });
-      response.end(JSON.stringify(jsonError(null, -32700, "Invalid JSON or MCP request")));
+      await server.connect(transport);
+      await transport.handleRequest(request, response);
+    } catch {
+      if (!response.headersSent) {
+        response.writeHead(400, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ ok: false, error: "Invalid MCP request" }));
+      }
     }
   });
 }
