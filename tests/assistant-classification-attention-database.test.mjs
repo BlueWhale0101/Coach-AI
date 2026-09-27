@@ -126,6 +126,13 @@ test("Classification and Attention PostgreSQL contracts", async t => {
 
     const cleared = await one("select * from public.assistant_replace_object_tags($1,$2::uuid[])", [target.object_id, []]);
     assert.deepEqual(cleared.tags, []);
+
+    const definition = (await one("select pg_get_functiondef('public.assistant_replace_object_tags(uuid,uuid[])'::regprocedure) definition")).definition;
+    const lockIndex = definition.indexOf("where t.object_id = any(v_distinct)\n    for update");
+    const activeValidationIndex = definition.indexOf("where t.object_id = any(v_distinct) and t.status = 'active'");
+    assert.ok(lockIndex > 0, "replacement must lock requested tag rows");
+    assert.ok(activeValidationIndex > lockIndex, "active-tag validation must occur after requested tag rows are locked");
+    assert.equal(definition.includes("and t.status = 'active'\n    for update"), false, "lock must not be limited to rows already active");
   });
 
   await t.test("category and tag listing uses documented case-insensitive SQL ordering across pages", async () => {
