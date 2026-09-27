@@ -31,12 +31,47 @@ test("batched decorations return category, tags, and pin without exposing public
   assert.deepEqual(result.decorations[item.object_id].classification.tags.map(entry => entry.name), ["decoration-test"]);
   assert.equal(result.decorations[item.object_id].pinned, true);
   await rows("select * from public.assistant_cancel_task($1)", [item.object_id]);
-  await db.exec("set role anon");
+  const functionName = "public.assistant_get_object_decorations(uuid[])";
+  assert.equal((await one("select has_function_privilege('anon',$1,'EXECUTE') allowed", [functionName])).allowed, false);
+  assert.equal((await one("select has_function_privilege('authenticated',$1,'EXECUTE') allowed", [functionName])).allowed, false);
+  assert.equal((await one("select has_function_privilege('service_role',$1,'EXECUTE') allowed", [functionName])).allowed, true);
+  for (const role of ["anon", "authenticated"]) {
+    await db.exec(`set role ${role}`);
+    try {
+      await assert.rejects(() => rows("select public.assistant_get_object_decorations('{}'::uuid[])"), error => error.code === "42501");
+    } finally {
+      await db.exec("reset role");
+    }
+  }
+  await db.exec("set role service_role");
   try {
-    await assert.rejects(() => rows("select public.assistant_get_object_decorations('{}'::uuid[])"), error => error.code === "42501");
+    const allowed = await one("select public.assistant_get_object_decorations($1::uuid[]) as decorations", [[item.object_id]]);
+    assert.equal(allowed.decorations[item.object_id].pinned, true);
   } finally {
     await db.exec("reset role");
   }
+});
+
+test("category view filters before paging for task and knowledge rows", async () => {
+  const category = await one("select * from public.assistant_create_category('Filtered view','#AABBCC',0)");
+  const uncategorizedTask = await task("Uncategorized task ahead of match");
+  const matchingTask = await task("Category match");
+  await rows("select * from public.assistant_set_object_category($1,$2)", [matchingTask.object_id, category.object_id]);
+  const uncategorizedKnowledge = await one("select * from public.assistant_create_knowledge('Uncategorized knowledge','earlier record')");
+  const matchingKnowledge = await one("select * from public.assistant_create_knowledge('Category knowledge','matching content')");
+  await rows("select * from public.assistant_set_object_category($1,$2)", [matchingKnowledge.object_id, category.object_id]);
+  const taskRows = await one("select public.assistant_list_category_view('task',$1,'open',null,1,0) as rows", [category.object_id]);
+  const knowledgeRows = await one("select public.assistant_list_category_view('knowledge',$1,'active',null,1,0) as rows", [category.object_id]);
+  assert.equal(taskRows.rows.length, 1);
+  assert.equal(taskRows.rows[0].object_id, matchingTask.object_id);
+  assert.equal(taskRows.rows[0].classification.category.object_id, category.object_id);
+  assert.equal(knowledgeRows.rows.length, 1);
+  assert.equal(knowledgeRows.rows[0].object_id, matchingKnowledge.object_id);
+  assert.equal(knowledgeRows.rows[0].classification.category.object_id, category.object_id);
+  await rows("select * from public.assistant_cancel_task($1)", [matchingTask.object_id]);
+  await rows("select * from public.assistant_cancel_task($1)", [uncategorizedTask.object_id]);
+  await rows("select * from public.assistant_archive_knowledge($1)", [matchingKnowledge.object_id]);
+  await rows("select * from public.assistant_archive_knowledge($1)", [uncategorizedKnowledge.object_id]);
 });
 
 test("Household Board Projection V0 composes Assistant state without durable board tables", async t => {

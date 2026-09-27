@@ -31,4 +31,17 @@ export class SupabaseProjectionRepository {
     if (error) throw translate(error);
     return data;
   }
+
+  async listCategoryView(options) {
+    const { data, error } = await this.client.rpc("assistant_list_category_view", {
+      p_object_type: options.object_type,
+      p_category_object_id: options.category_id,
+      p_status: options.status,
+      p_query: options.query,
+      p_limit: options.limit,
+      p_offset: options.offset,
+    });
+    if (error) throw translate(error);
+    return data ?? [];
+  }
 }

@@ -329,12 +329,15 @@ export async function listTaskView({ query = "", status = "open", categoryId = "
       .map(task => ({ ...task, tagObjects: task.tags.map(name => ({ name })) }));
   }
   const body = { status: status || undefined, limit, offset };
+  const now = new Date().toISOString();
+  if (categoryId) {
+    const filtered = await postApi("/api/category-view", { object_type: "task", category_id: categoryId, status: status || null, query: query.trim() || null, limit, offset });
+    return (filtered.rows ?? []).map(row => normalizeTaskRow(row, { now, timezone: DEFAULT_TIMEZONE, classification: row.classification, pinned: row.pinned }));
+  }
   const data = query.trim()
     ? await postApi("/api/search-tasks", { ...body, query: query.trim() })
     : await postApi("/api/list-tasks", body);
-  const now = new Date().toISOString();
-  const tasks = await enrichRows(data.tasks, normalizeTaskRow, { now, timezone: DEFAULT_TIMEZONE });
-  return categoryId ? tasks.filter(task => task.category?.id === categoryId) : tasks;
+  return enrichRows(data.tasks, normalizeTaskRow, { now, timezone: DEFAULT_TIMEZONE });
 }
 
 export async function pinObject(objectId) {
@@ -421,12 +424,15 @@ export async function listKnowledgeView({ query = "", status = "active", categor
       .filter(item => !tagName || item.tags.includes(tagName));
   }
   const body = { status: status || undefined, limit, offset };
+  if (categoryId) {
+    const filtered = await postApi("/api/category-view", { object_type: "knowledge", category_id: categoryId, status: status || null, query: query.trim() || null, limit, offset });
+    return (filtered.rows ?? []).map(row => normalizeKnowledgeRow(row, { classification: row.classification, pinned: row.pinned }));
+  }
   const data = query.trim()
     ? await postApi("/api/search-knowledge", { ...body, query: query.trim() })
     : await postApi("/api/list-knowledge", body);
   const items = await enrichRows(data.knowledge, normalizeKnowledgeRow);
   return items
-    .filter(item => !categoryId || item.category?.id === categoryId)
     .filter(item => !tagName || item.tags.includes(tagName));
 }
 

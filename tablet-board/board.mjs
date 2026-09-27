@@ -18,7 +18,7 @@ import {
 import { StagedMutationController } from "./mutation-staging.mjs";
 import { DAY_END_MINUTE, PIXELS_PER_HOUR, formatTime, hourLabels, layoutTimedEvents, minutesToPixels, visibleAllDayItems } from "./calendar-layout.mjs";
 import { VISIBLE_HOUR_OPTIONS, loadDisplaySettings, normalizeDisplaySettings, resetDisplaySettings, saveDisplaySettings, tintAlpha } from "./display-settings.mjs";
-import { addDays, computePaneHourPixels, eventDateKey, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, weekDays, weekRange } from "./view-helpers.mjs";
+import { addDays, computePaneHourPixels, eventDateKey, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, taskActionsForStatus, weekDays, weekRange } from "./view-helpers.mjs";
 
 const STAGE_DELAY_MS = 5000;
 const root = document.querySelector("#board-root");
@@ -215,23 +215,32 @@ function renderHeader(title, eyebrow = "ASSISTANT") {
 function taskActions(task, { includeCancel = false } = {}) {
   const actions = document.createElement("div");
   actions.className = "task-actions";
-  const complete = button("Complete", "solid-button");
-  complete.addEventListener("click", (event) => {
-    event.stopPropagation();
-    completeTask(task);
-  });
-  const pin = button(task.pinned ? "Unpin" : "Pin");
-  pin.addEventListener("click", (event) => {
-    event.stopPropagation();
-    togglePin(task);
-  });
-  const edit = button("Edit");
-  edit.addEventListener("click", (event) => {
-    event.stopPropagation();
-    editTask(task);
-  });
-  actions.append(complete, pin, edit);
-  if (includeCancel) {
+  const allowed = taskActionsForStatus(task.status);
+  if (allowed.includes("complete")) {
+    const complete = button("Complete", "solid-button");
+    complete.addEventListener("click", (event) => {
+      event.stopPropagation();
+      completeTask(task);
+    });
+    actions.appendChild(complete);
+  }
+  if (allowed.includes("pin")) {
+    const pin = button(task.pinned ? "Unpin" : "Pin");
+    pin.addEventListener("click", (event) => {
+      event.stopPropagation();
+      togglePin(task);
+    });
+    actions.appendChild(pin);
+  }
+  if (allowed.includes("edit")) {
+    const edit = button("Edit");
+    edit.addEventListener("click", (event) => {
+      event.stopPropagation();
+      editTask(task);
+    });
+    actions.appendChild(edit);
+  }
+  if (includeCancel && allowed.includes("cancel")) {
     const cancel = button("Cancel");
     cancel.addEventListener("click", (event) => {
       event.stopPropagation();

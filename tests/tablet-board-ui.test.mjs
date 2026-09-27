@@ -23,6 +23,7 @@ import {
   localDateKey,
   localTimeMinutes,
   startOfWeek,
+  taskActionsForStatus,
   weekRange,
   zonedMidnightUtc,
 } from "../tablet-board/view-helpers.mjs";
@@ -160,4 +161,11 @@ test("calendar boundaries and current day follow Darwin rather than UTC or brows
   assert.equal(localTimeMinutes(instant), 90);
   assert.equal(zonedMidnightUtc("2026-09-27"), "2026-09-26T14:30:00.000Z");
   assert.equal(zonedMidnightUtc("2026-10-04"), "2026-10-03T14:30:00.000Z");
+});
+
+test("task action policy matches the Tasks V0 lifecycle", () => {
+  assert.deepEqual(taskActionsForStatus("open"), ["complete", "pin", "edit", "cancel"]);
+  assert.deepEqual(taskActionsForStatus("completed"), ["pin", "edit"]);
+  assert.deepEqual(taskActionsForStatus("cancelled"), ["pin", "edit"]);
+  assert.deepEqual(taskActionsForStatus("unknown"), []);
 });

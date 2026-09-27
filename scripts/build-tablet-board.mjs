@@ -49,6 +49,7 @@ const worker = `const ASSETS = ${JSON.stringify(assets)};
 const ROUTES = {
   "/api/household-board": "get-household-board",
   "/api/object-decorations": "get-object-decorations",
+  "/api/category-view": "get-category-view",
   "/api/complete-task": "complete-task",
   "/api/update-task": "update-task",
   "/api/cancel-task": "cancel-task",

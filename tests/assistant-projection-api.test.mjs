@@ -78,3 +78,28 @@ test("decoration projection validates and deduplicates bounded object IDs", asyn
   assert.equal((await bad.json()).code, "VALIDATION_ERROR");
   assert.equal((await handler(request({ object_ids: [id], other: 1 }))).status, 400);
 });
+
+test("category projection validates filters before delegating the bounded page", async () => {
+  const category = "10000000-0000-4000-8000-000000000001";
+  let received;
+  const repo = { listCategoryView: async options => { received = options; return [{ object_id: "row" }]; } };
+  const handler = createProjectionHandler({ repository: repo, actionSecret: "secret", operation: "category-list" });
+  const result = await handler(request({ object_type: "task", category_id: category, status: "open", query: "  call ", limit: 20, offset: 5 }));
+  assert.deepEqual(received, { object_type: "task", category_id: category, status: "open", query: "call", limit: 20, offset: 5 });
+  assert.deepEqual((await result.json()).data.rows, [{ object_id: "row" }]);
+  for (const body of [
+    { object_type: "task", category_id: "bad" },
+    { object_type: "task", category_id: category, status: "active" },
+    { object_type: "knowledge", category_id: category, limit: 101 },
+  ]) assert.equal((await handler(request(body))).status, 400);
+});
+
+test("projection repository sends bounded category view filters to the read RPC", async () => {
+  let call;
+  const repo = new SupabaseProjectionRepository({ rpc: async (...args) => { call = args; return { data: [], error: null }; } });
+  await repo.listCategoryView({ object_type: "knowledge", category_id: "cat", status: "active", query: "word", limit: 80, offset: 0 });
+  assert.deepEqual(call, ["assistant_list_category_view", {
+    p_object_type: "knowledge", p_category_object_id: "cat", p_status: "active",
+    p_query: "word", p_limit: 80, p_offset: 0,
+  }]);
+});

@@ -76,3 +76,9 @@ export function eventDateKey(event) {
   if (event.time_kind === "all_day") return event.start_date;
   return event.date;
 }
+
+export function taskActionsForStatus(status) {
+  if (status === "open") return ["complete", "pin", "edit", "cancel"];
+  if (status === "completed" || status === "cancelled") return ["pin", "edit"];
+  return [];
+}
