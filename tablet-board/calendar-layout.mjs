@@ -17,8 +17,8 @@ export function formatTime(time) {
   return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
-export function minutesToPixels(minutes) {
-  return (minutes / 60) * PIXELS_PER_HOUR;
+export function minutesToPixels(minutes, pixelsPerHour = PIXELS_PER_HOUR) {
+  return (minutes / 60) * pixelsPerHour;
 }
 
 function overlaps(a, b) {
@@ -66,7 +66,7 @@ function assignColumns(group) {
   });
 }
 
-export function layoutTimedEvents(events) {
+export function layoutTimedEvents(events, pixelsPerHour = PIXELS_PER_HOUR) {
   const normalized = events.map((event) => {
     const startMinute = parseTimeToMinutes(event.start);
     const endMinute = parseTimeToMinutes(event.end);
@@ -86,11 +86,11 @@ export function layoutTimedEvents(events) {
       const widthPercent = 100 / columnCount;
       return {
         ...event,
-        top: minutesToPixels(event.startMinute - DAY_START_MINUTE),
-        height: Math.max(minutesToPixels(event.durationMinute), MIN_EVENT_HEIGHT),
+        top: minutesToPixels(event.startMinute - DAY_START_MINUTE, pixelsPerHour),
+        height: Math.max(minutesToPixels(event.durationMinute, pixelsPerHour), MIN_EVENT_HEIGHT),
         leftPercent: event.columnIndex * widthPercent,
         widthPercent,
-        actualHeight: minutesToPixels(event.durationMinute),
+        actualHeight: minutesToPixels(event.durationMinute, pixelsPerHour),
       };
     });
   });
@@ -103,13 +103,13 @@ export function visibleAllDayItems(items, maxRows = 2) {
   };
 }
 
-export function hourLabels() {
+export function hourLabels(pixelsPerHour = PIXELS_PER_HOUR) {
   const labels = [];
   for (let hour = 0; hour <= 24; hour += 1) {
     labels.push({
       hour,
       label: hour === 0 ? "12 AM" : hour === 12 ? "12 PM" : hour > 12 ? `${hour - 12} PM` : `${hour} AM`,
-      top: minutesToPixels(hour * 60),
+      top: minutesToPixels(hour * 60, pixelsPerHour),
     });
   }
   return labels;

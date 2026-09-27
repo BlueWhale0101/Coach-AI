@@ -13,9 +13,17 @@ import {
   hourLabels,
   layoutTimedEvents,
   minutesToPixels,
-  parseTimeToMinutes,
   visibleAllDayItems,
 } from "./calendar-layout.mjs";
+import {
+  VISIBLE_HOUR_OPTIONS,
+  loadDisplaySettings,
+  normalizeDisplaySettings,
+  pixelsPerHourFor,
+  resetDisplaySettings,
+  saveDisplaySettings,
+  tintAlpha,
+} from "./display-settings.mjs";
 
 const STAGE_DELAY_MS = 5000;
 
@@ -26,6 +34,9 @@ const state = {
   expandedTaskId: null,
   pendingMutation: null,
   selectedEventId: null,
+  displaySettings: loadDisplaySettings(),
+  navOpen: false,
+  settingsOpen: false,
 };
 
 const root = document.querySelector("#board-root");
@@ -51,7 +62,7 @@ function tint(hex, alpha) {
 function applyCategoryVars(element, item, alpha = 0.16) {
   const category = categoryFor(item);
   element.style.setProperty("--category", category.color);
-  element.style.setProperty("--category-tint", tint(category.color, alpha));
+  element.style.setProperty("--category-tint", tint(category.color, tintAlpha(state.displaySettings, alpha)));
 }
 
 function button(label, className = "ghost-button") {
@@ -213,6 +224,57 @@ function renderTask(task) {
   return card;
 }
 
+function updateDisplaySettings(patch, { renderBoard = true } = {}) {
+  state.displaySettings = saveDisplaySettings({ ...state.displaySettings, ...patch });
+  applyDisplaySettings();
+  if (renderBoard) render();
+}
+
+function restoreDefaultDisplaySettings() {
+  state.displaySettings = resetDisplaySettings();
+  render();
+}
+
+function currentPixelsPerHour() {
+  return pixelsPerHourFor(state.displaySettings, PIXELS_PER_HOUR);
+}
+
+function applyDisplaySettings() {
+  const settings = normalizeDisplaySettings(state.displaySettings);
+  state.displaySettings = settings;
+  root.style.setProperty("--task-pane-width", `${settings.taskSplitPercent}%`);
+  root.style.setProperty("--text-scale", String(settings.textScale / 100));
+  root.style.setProperty("--hour", `${currentPixelsPerHour()}px`);
+  root.style.setProperty("--today-pane", `${settings.todayWidthPercent}fr`);
+  root.style.setProperty("--tomorrow-pane", `${100 - settings.todayWidthPercent}fr`);
+}
+
+function formatHour(hour) {
+  const wrapped = ((hour % 24) + 24) % 24;
+  if (wrapped === 0) return "12 AM";
+  if (wrapped === 12) return "12 PM";
+  return wrapped > 12 ? `${wrapped - 12} PM` : `${wrapped} AM`;
+}
+
+function updateTimeRangeLabel() {
+  const label = document.querySelector(".time-range");
+  if (!label) return;
+  const visibleEnd = Math.min(24, state.displaySettings.startHour + state.displaySettings.visibleHours);
+  label.textContent = `${formatHour(state.displaySettings.startHour)}-${formatHour(visibleEnd)}`;
+}
+
+function renderMenuButton() {
+  const node = button("Menu", "menu-button");
+  node.setAttribute("aria-expanded", String(state.navOpen));
+  node.addEventListener("click", (event) => {
+    event.stopPropagation();
+    state.navOpen = !state.navOpen;
+    state.settingsOpen = false;
+    render();
+  });
+  return node;
+}
+
 function completeTask(taskId) {
   if (!state.snapshot) return;
   const task = state.snapshot.tasks.find((item) => item.id === taskId);
@@ -253,15 +315,22 @@ function renderTasks() {
   const section = document.createElement("section");
   section.className = "task-board";
   section.setAttribute("aria-label", "Upcoming tasks");
-  section.innerHTML = `
-    <div class="section-header">
-      <div>
-        <p class="eyebrow">UPCOMING</p>
-        <h1>Household tasks</h1>
-      </div>
-      <div class="task-count">${state.snapshot.tasks.length}</div>
-    </div>
+  const header = document.createElement("div");
+  header.className = "section-header";
+  const titleGroup = document.createElement("div");
+  titleGroup.className = "title-with-menu";
+  titleGroup.appendChild(renderMenuButton());
+  const copy = document.createElement("div");
+  copy.innerHTML = `
+    <p class="eyebrow">UPCOMING</p>
+    <h1>Household tasks</h1>
   `;
+  titleGroup.appendChild(copy);
+  const count = document.createElement("div");
+  count.className = "task-count";
+  count.textContent = String(state.snapshot.tasks.length);
+  header.append(titleGroup, count);
+  section.appendChild(header);
   const list = document.createElement("div");
   list.className = "task-list";
   if (state.snapshot.tasks.length) state.snapshot.tasks.forEach((task) => list.appendChild(renderTask(task)));
@@ -346,6 +415,7 @@ function renderEventPopover() {
 }
 
 function renderDay(day) {
+  const pixelsPerHour = currentPixelsPerHour();
   const column = document.createElement("section");
   column.className = `day-column ${day.id}`;
   column.setAttribute("aria-label", `${day.label} calendar`);
@@ -361,9 +431,9 @@ function renderDay(day) {
 
   const grid = document.createElement("div");
   grid.className = "day-grid";
-  grid.style.height = `${minutesToPixels(DAY_END_MINUTE)}px`;
+  grid.style.height = `${minutesToPixels(DAY_END_MINUTE, pixelsPerHour)}px`;
 
-  hourLabels().forEach((hour) => {
+  hourLabels(pixelsPerHour).forEach((hour) => {
     const line = document.createElement("div");
     line.className = "hour-line";
     line.style.top = `${hour.top}px`;
@@ -375,16 +445,17 @@ function renderDay(day) {
     const minutes = now.getHours() * 60 + now.getMinutes();
     const line = document.createElement("div");
     line.className = "now-line";
-    line.style.top = `${minutesToPixels(minutes)}px`;
+    line.style.top = `${minutesToPixels(minutes, pixelsPerHour)}px`;
     grid.appendChild(line);
   }
 
-  layoutTimedEvents(day.events).forEach((event) => grid.appendChild(renderEventCard(event, day)));
+  layoutTimedEvents(day.events, pixelsPerHour).forEach((event) => grid.appendChild(renderEventCard(event, day)));
   column.appendChild(grid);
   return column;
 }
 
 function renderCalendar() {
+  const visibleEnd = Math.min(24, state.displaySettings.startHour + state.displaySettings.visibleHours);
   const section = document.createElement("section");
   section.className = "calendar-board";
   section.setAttribute("aria-label", "Calendar");
@@ -394,7 +465,7 @@ function renderCalendar() {
         <p class="eyebrow">CALENDAR</p>
         <h1>Today and tomorrow</h1>
       </div>
-      <div class="time-range">7 AM-3 PM</div>
+      <div class="time-range">${formatHour(state.displaySettings.startHour)}-${formatHour(visibleEnd)}</div>
     </div>
   `;
 
@@ -407,8 +478,8 @@ function renderCalendar() {
 
   const scale = document.createElement("div");
   scale.className = "time-scale";
-  scale.style.height = `${minutesToPixels(DAY_END_MINUTE)}px`;
-  hourLabels().forEach((hour) => {
+  scale.style.height = `${minutesToPixels(DAY_END_MINUTE, currentPixelsPerHour())}px`;
+  hourLabels(currentPixelsPerHour()).forEach((hour) => {
     const label = document.createElement("div");
     label.className = "hour-label";
     label.style.top = `${hour.top}px`;
@@ -427,11 +498,197 @@ function renderCalendar() {
   return section;
 }
 
-function setInitialCalendarScroll() {
+function setInitialCalendarScroll(force = false) {
   const scroller = document.querySelector(".calendar-scroll");
-  if (scroller && scroller.scrollTop < 10) {
-    scroller.scrollTop = minutesToPixels(parseTimeToMinutes("07:00"));
+  if (scroller && (force || scroller.scrollTop < 10)) {
+    scroller.scrollTop = minutesToPixels(state.displaySettings.startHour * 60, currentPixelsPerHour());
   }
+}
+
+function renderDivider() {
+  const divider = document.createElement("div");
+  divider.className = "pane-divider";
+  divider.setAttribute("role", "separator");
+  divider.setAttribute("aria-orientation", "vertical");
+  divider.setAttribute("aria-label", "Resize tasks and calendar");
+  divider.tabIndex = 0;
+
+  const setFromClientX = (clientX, persist = false) => {
+    const rect = root.getBoundingClientRect();
+    const percent = ((clientX - rect.left) / rect.width) * 100;
+    state.displaySettings = normalizeDisplaySettings({ ...state.displaySettings, taskSplitPercent: percent });
+    applyDisplaySettings();
+    if (persist) saveDisplaySettings(state.displaySettings);
+  };
+
+  divider.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    divider.setPointerCapture(event.pointerId);
+    divider.classList.add("dragging");
+    setFromClientX(event.clientX);
+  });
+  divider.addEventListener("pointermove", (event) => {
+    if (!divider.hasPointerCapture(event.pointerId)) return;
+    setFromClientX(event.clientX);
+  });
+  divider.addEventListener("pointerup", (event) => {
+    if (divider.hasPointerCapture(event.pointerId)) divider.releasePointerCapture(event.pointerId);
+    divider.classList.remove("dragging");
+    setFromClientX(event.clientX, true);
+  });
+  divider.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const delta = event.key === "ArrowLeft" ? -1 : 1;
+    updateDisplaySettings({ taskSplitPercent: state.displaySettings.taskSplitPercent + delta });
+  });
+  return divider;
+}
+
+function renderNavOverlay() {
+  if (!state.navOpen && !state.settingsOpen) return null;
+  const overlay = document.createElement("div");
+  overlay.className = "board-overlay";
+  overlay.addEventListener("click", () => {
+    state.navOpen = false;
+    state.settingsOpen = false;
+    render();
+  });
+
+  const panel = document.createElement("aside");
+  panel.className = state.settingsOpen ? "nav-drawer settings-drawer" : "nav-drawer";
+  panel.addEventListener("click", event => event.stopPropagation());
+  overlay.appendChild(panel);
+
+  if (state.settingsOpen) {
+    panel.appendChild(renderDisplaySettings());
+  } else {
+    panel.appendChild(renderNavigation());
+  }
+  return overlay;
+}
+
+function renderNavigation() {
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">ASSISTANT</p>
+        <h2>Views</h2>
+      </div>
+      <button type="button" class="icon-button" aria-label="Close menu">×</button>
+    </div>
+  `;
+  wrap.querySelector("button").addEventListener("click", () => {
+    state.navOpen = false;
+    render();
+  });
+  const list = document.createElement("div");
+  list.className = "nav-list";
+  ["Board", "Tasks", "Calendar", "Knowledge", "Settings"].forEach((label) => {
+    const item = button(label, label === "Board" ? "nav-item active" : "nav-item");
+    if (label === "Settings") {
+      item.addEventListener("click", () => {
+        state.settingsOpen = true;
+        state.navOpen = false;
+        render();
+      });
+    } else if (label !== "Board") {
+      item.disabled = true;
+      item.title = `${label} view is not implemented in this prototype.`;
+    } else {
+      item.addEventListener("click", () => {
+        state.navOpen = false;
+        render();
+      });
+    }
+    list.appendChild(item);
+  });
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function labeledRange({ label, value, min, max, step = 1, suffix = "", onInput }) {
+  const row = document.createElement("label");
+  row.className = "setting-row";
+  const valueText = document.createElement("span");
+  valueText.className = "setting-value";
+  valueText.textContent = `${value}${suffix}`;
+  const input = document.createElement("input");
+  input.type = "range";
+  input.min = String(min);
+  input.max = String(max);
+  input.step = String(step);
+  input.value = String(value);
+  input.addEventListener("input", () => {
+    valueText.textContent = `${input.value}${suffix}`;
+    onInput(Number(input.value));
+  });
+  row.innerHTML = `<span>${label}</span>`;
+  row.append(valueText, input);
+  return row;
+}
+
+function renderDisplaySettings() {
+  const settings = state.displaySettings;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">DISPLAY</p>
+        <h2>Settings</h2>
+      </div>
+      <button type="button" class="icon-button" aria-label="Close settings">×</button>
+    </div>
+  `;
+  wrap.querySelector("button").addEventListener("click", () => {
+    state.settingsOpen = false;
+    render();
+  });
+
+  const form = document.createElement("div");
+  form.className = "settings-form";
+  form.append(
+    labeledRange({ label: "Text size", value: settings.textScale, min: 85, max: 130, suffix: "%", onInput: value => updateDisplaySettings({ textScale: value }, { renderBoard: false }) }),
+    labeledRange({ label: "Tasks width", value: settings.taskSplitPercent, min: 30, max: 48, suffix: "%", onInput: value => updateDisplaySettings({ taskSplitPercent: value }, { renderBoard: false }) }),
+    renderChoice("Calendar visible hours", String(settings.visibleHours), VISIBLE_HOUR_OPTIONS.map(String), value => updateDisplaySettings({ visibleHours: Number(value) })),
+    labeledRange({
+      label: "Calendar starting hour",
+      value: settings.startHour,
+      min: 0,
+      max: 18,
+      suffix: ":00",
+      onInput: (value) => {
+        updateDisplaySettings({ startHour: value }, { renderBoard: false });
+        updateTimeRangeLabel();
+        setInitialCalendarScroll(true);
+      },
+    }),
+    labeledRange({ label: "Today width", value: settings.todayWidthPercent, min: 55, max: 72, suffix: "%", onInput: value => updateDisplaySettings({ todayWidthPercent: value }, { renderBoard: false }) }),
+    renderChoice("Category tint", settings.categoryTint, ["low", "medium", "strong"], value => updateDisplaySettings({ categoryTint: value })),
+  );
+  const reset = button("Reset display settings", "reset-button");
+  reset.addEventListener("click", restoreDefaultDisplaySettings);
+  form.appendChild(reset);
+  wrap.appendChild(form);
+  return wrap;
+}
+
+function renderChoice(label, current, options, onChange) {
+  const field = document.createElement("fieldset");
+  field.className = "choice-setting";
+  const legend = document.createElement("legend");
+  legend.textContent = label;
+  field.appendChild(legend);
+  const group = document.createElement("div");
+  group.className = "choice-group";
+  options.forEach((option) => {
+    const choice = button(option[0].toUpperCase() + option.slice(1), option === current ? "choice-button selected" : "choice-button");
+    choice.addEventListener("click", () => onChange(option));
+    group.appendChild(choice);
+  });
+  field.appendChild(group);
+  return field;
 }
 
 function renderLoading() {
@@ -458,7 +715,10 @@ function render() {
   if (state.loading) return renderLoading();
   if (state.error) return renderError();
   root.innerHTML = "";
-  root.append(renderTasks(), renderCalendar());
+  applyDisplaySettings();
+  root.append(renderTasks(), renderDivider(), renderCalendar());
+  const overlay = renderNavOverlay();
+  if (overlay) root.appendChild(overlay);
   requestAnimationFrame(setInitialCalendarScroll);
 }
 
