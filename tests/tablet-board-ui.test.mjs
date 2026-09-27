@@ -16,6 +16,13 @@ import {
   resetDisplaySettings,
   saveDisplaySettings,
 } from "../tablet-board/display-settings.mjs";
+import {
+  computePaneHourPixels,
+  pathForRoute,
+  routeFromPath,
+  startOfWeek,
+  weekRange,
+} from "../tablet-board/view-helpers.mjs";
 
 test("tablet board fixtures stay rich enough to exercise the household UI", () => {
   const snapshot = getFixtureBoardSnapshot();
@@ -120,4 +127,25 @@ test("display settings preserve supported tablet defaults", () => {
   assert.equal(settings.todayWidthPercent, 62);
   assert.equal(settings.visibleHours, 8);
   assert.equal(settings.startHour, 7);
+});
+
+test("tablet routes support direct navigation and history targets", () => {
+  assert.equal(routeFromPath("/tablet-board/"), "board");
+  assert.equal(routeFromPath("/tablet-board/tasks"), "tasks");
+  assert.equal(routeFromPath("/tablet-board/calendar/"), "calendar");
+  assert.equal(routeFromPath("/tablet-board/knowledge"), "knowledge");
+  assert.equal(routeFromPath("/tablet-board/missing"), "board");
+  assert.equal(pathForRoute("tasks"), "/tablet-board/tasks");
+});
+
+test("board calendar hour scale is derived from the visible pane height", () => {
+  assert.equal(computePaneHourPixels({ paneHeight: 736, visibleHours: 8 }), 80);
+  assert.equal(computePaneHourPixels({ paneHeight: 736, visibleHours: 12 }), 53);
+  assert.equal(computePaneHourPixels({ paneHeight: 260, visibleHours: 12 }), 44);
+});
+
+test("calendar week helpers use a seven day exclusive range", () => {
+  const start = startOfWeek(new Date("2026-09-30T12:00:00Z"));
+  assert.equal(weekRange(start).start, "2026-09-27");
+  assert.equal(weekRange(start).endExclusive, "2026-10-04");
 });

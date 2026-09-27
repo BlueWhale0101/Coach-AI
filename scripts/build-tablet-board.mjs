@@ -38,6 +38,10 @@ const assets = {
     type: "text/javascript; charset=utf-8",
     body: await readFile(resolve(root, "tablet-board/mutation-staging.mjs"), "utf8"),
   },
+  "/tablet-board/view-helpers.mjs": {
+    type: "text/javascript; charset=utf-8",
+    body: await readFile(resolve(root, "tablet-board/view-helpers.mjs"), "utf8"),
+  },
 };
 
 const worker = `const ASSETS = ${JSON.stringify(assets)};
@@ -45,8 +49,23 @@ const worker = `const ASSETS = ${JSON.stringify(assets)};
 const ROUTES = {
   "/api/household-board": "get-household-board",
   "/api/complete-task": "complete-task",
+  "/api/update-task": "update-task",
+  "/api/cancel-task": "cancel-task",
+  "/api/list-tasks": "list-tasks",
+  "/api/search-tasks": "search-tasks",
+  "/api/list-schedule-events": "list-schedule-events",
+  "/api/update-schedule-event": "update-schedule-event",
+  "/api/cancel-schedule-event": "cancel-schedule-event",
+  "/api/list-knowledge": "list-knowledge",
+  "/api/search-knowledge": "search-knowledge",
+  "/api/update-knowledge": "update-knowledge",
+  "/api/archive-knowledge": "archive-knowledge",
+  "/api/list-categories": "list-categories",
+  "/api/list-tags": "list-tags",
+  "/api/get-object-classification": "get-object-classification",
   "/api/pin-object": "pin-object",
   "/api/unpin-object": "unpin-object",
+  "/api/is-object-pinned": "is-object-pinned",
 };
 
 const cors = {
@@ -112,6 +131,7 @@ export default {
     const found = asset(url.pathname);
     if (found) return found;
     if (url.pathname === "/tablet-board") return Response.redirect(new URL("/tablet-board/", url), 308);
+    if (url.pathname.startsWith("/tablet-board/")) return asset("/tablet-board/");
     return new Response("Not found", { status: 404 });
   },
 };
