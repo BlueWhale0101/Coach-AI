@@ -42,6 +42,7 @@ test("classification endpoints validate, route, envelope and page", async () => 
     listTags: async v => { seen.push(["listTags", v]); return { rows: [tag], hasMore: false }; },
     addObjectTag: async (...v) => { seen.push(["addObjectTag", ...v]); return classification; },
     removeObjectTag: async (...v) => { seen.push(["removeObjectTag", ...v]); return { ...classification, tags: [] }; },
+    replaceObjectTags: async (...v) => { seen.push(["replaceObjectTags", ...v]); return classification; },
     getObjectClassification: async v => { seen.push(["getObjectClassification", v]); return classification; },
     listCategoryMembers: async (...v) => { seen.push(["listCategoryMembers", ...v]); return { rows: [{ target_object_id: id }], hasMore: false }; },
     listTagMembers: async (...v) => { seen.push(["listTagMembers", ...v]); return { rows: [{ target_object_id: id }], hasMore: true }; },
@@ -59,6 +60,7 @@ test("classification endpoints validate, route, envelope and page", async () => 
     ["get_tag", { object_id: other }, "tag"],
     ["add_object_tag", { target_object_id: id, tag_object_id: other }, "classification"],
     ["remove_object_tag", { target_object_id: id, tag_object_id: other }, "classification"],
+    ["replace_object_tags", { target_object_id: id, tag_object_ids: [other] }, "classification"],
     ["get_object_classification", { target_object_id: id }, "classification"],
   ]) {
     const [status, body] = await classCall(operation, input, repository);
@@ -90,6 +92,7 @@ test("classification auth, validation and safe errors", async () => {
     ["update_tag", { object_id: id, color: "#000000" }, "IMMUTABLE_FIELD"],
     ["list_categories", { limit: 101 }, "INVALID_PAGINATION"],
     ["set_object_category", { target_object_id: id, category_object_id: "bad" }, "INVALID_OBJECT_ID"],
+    ["replace_object_tags", { target_object_id: id, tag_object_ids: [other, "bad"] }, "INVALID_OBJECT_ID"],
   ]) {
     const [status, body] = await classCall(operation, input, repository);
     assert.equal(status, 400);
@@ -142,7 +145,11 @@ test("repositories map RPCs, pagination sentinels and safe database failures", a
   assert.deepEqual(calls.at(-1), ["assistant_list_categories", { p_status: null, p_limit: 2, p_offset: 3 }]);
   assert.deepEqual(await classificationRepo.listTags({ status: "active", limit: 1, offset: 4 }), { rows: [tag], hasMore: true });
   assert.deepEqual(calls.at(-1), ["assistant_list_tags", { p_status: "active", p_limit: 2, p_offset: 4 }]);
+  assert.deepEqual(await classificationRepo.replaceObjectTags(id, [other]), category);
+  assert.deepEqual(calls.at(-1), ["assistant_replace_object_tags", { p_target_object_id: id, p_tag_object_ids: [other] }]);
   await assert.rejects(() => classificationRepo.getCategory(id), error => error.code === "CATEGORY_NOT_FOUND");
+  const badClassification = new SupabaseClassificationRepository({ rpc: async () => ({ data: null, error: { code: "P0002", message: "secret tag detail" } }) });
+  await assert.rejects(() => badClassification.replaceObjectTags(id, [other]), error => error.code === "TAG_NOT_FOUND" && !/secret/.test(error.message));
   const attentionRepo = new SupabaseAttentionRepository({ rpc });
   assert.deepEqual(await attentionRepo.list({ limit: 1, offset: 2 }), { rows: [pin], hasMore: true });
   assert.deepEqual(calls.at(-1), ["assistant_list_pinned_objects", { p_limit: 2, p_offset: 2 }]);

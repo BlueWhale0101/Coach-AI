@@ -82,6 +82,11 @@ export class SupabaseClassificationRepository {
     if (error) throw translate(error, "TAG");
     return this.getObjectClassification(targetId);
   }
+  async replaceObjectTags(targetId, tagIds) {
+    const { data, error } = await this.client.rpc("assistant_replace_object_tags", { p_target_object_id: targetId, p_tag_object_ids: tagIds });
+    if (error) throw translate(error, error.code === "P0002" ? "TAG" : "CLASSIFICATION");
+    return one(data, null, "CLASSIFICATION");
+  }
   async getObjectClassification(targetId) {
     const { data, error } = await this.client.rpc("assistant_get_object_classification", { p_target_object_id: targetId });
     return one(data, error, "CLASSIFICATION");

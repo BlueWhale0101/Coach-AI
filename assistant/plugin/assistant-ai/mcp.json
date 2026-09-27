@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "assistant-ai": {
+      "type": "streamable-http",
+      "url": "https://REPLACE_WITH_ASSISTANT_MCP_HOST/mcp"
+    }
+  }
+}

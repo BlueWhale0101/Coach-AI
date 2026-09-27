@@ -143,6 +143,9 @@ verify_jwt = false
 [functions.remove-object-tag]
 verify_jwt = false
 
+[functions.replace-object-tags]
+verify_jwt = false
+
 [functions.get-object-classification]
 verify_jwt = false
 

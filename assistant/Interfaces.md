@@ -432,6 +432,7 @@ with `verify_jwt = false` and uses the server-side service role.
 | `list-tags` | Optional `status`, `limit`, `offset` | `{ "tags": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
 | `add-object-tag` | `target_object_id`, active `tag_object_id` | `{ "classification": Classification }` |
 | `remove-object-tag` | `target_object_id`, `tag_object_id` | `{ "classification": Classification }` |
+| `replace-object-tags` | `target_object_id`, complete `tag_object_ids` array of active Tag IDs | `{ "classification": Classification }` |
 | `get-object-classification` | `target_object_id` | `{ "classification": Classification }` |
 | `list-category-members` | `category_object_id`, optional `limit`, `offset` | `{ "members": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
 | `list-tag-members` | `tag_object_id`, optional `limit`, `offset` | `{ "members": [], "limit": 50, "offset": 0, "count": 0, "has_more": false }` |
@@ -575,3 +576,57 @@ Forward migration `20260927074730_assistant_projection_household_board_v0.sql`
 adds no tables. It adds only read-only `SECURITY INVOKER` Projection RPCs and
 service-role-only execute grants. Existing Coach and Assistant module
 contracts are unchanged.
+
+---
+
+# Assistant.AI MCP / Plugin Surface — V0
+
+The MCP surface is a server-side conversational adapter over existing Assistant
+Edge Function capabilities. It owns no durable state and exposes no database
+or registry mutation primitive. Tool calls use the owning module capability
+and return agent-facing structured content with stable `object_id` values where
+subsequent mutation may be possible.
+
+The portable plugin package is in `assistant/plugin/assistant-ai`; its bundled
+skill describes the semantic distinctions the model should apply. The MCP
+server implementation is in `assistant/mcp` and uses the official
+`@modelcontextprotocol/sdk` server with Streamable HTTP transport at `/mcp`.
+
+V0 exposes these conversational tools:
+
+```text
+find_tasks, get_task, create_task, update_task, complete_task, cancel_task
+find_knowledge, get_knowledge, remember, update_knowledge, archive_knowledge
+find_events, get_event, create_event, update_event, cancel_event
+set_reminder
+set_recurrence, update_recurrence, end_recurrence
+set_category, set_tags
+pin, unpin
+get_household_board
+```
+
+Read tools are annotated read-only. Terminal V0 operations (`complete_task`,
+`cancel_task`, `archive_knowledge`, `cancel_event`, `end_recurrence`) are
+annotated destructive/consequential. Writes require stable object IDs. The MCP
+adapter does not silently resolve vague references before mutation; the model
+must search/read and ask for clarification when identity remains ambiguous.
+
+`set_category` resolves an existing active Category by name or clears with
+`category_name: null`. Unknown category names return `UNKNOWN_CATEGORY` with
+available active categories and perform no mutation. `set_tags` resolves all
+requested active Tag names first. If any tag is unknown, it returns
+`UNKNOWN_TAG` and performs no mutation. Once names resolve, MCP invokes the
+Classification-owned `replace-object-tags` capability to atomically replace
+the complete tag set with exactly the requested existing active Tags.
+
+The server calls Assistant Edge Functions with server-side
+`ACTION_API_SECRET`. Browsers never receive the action secret or service-role
+credentials. Published ChatGPT plugin deployment requires a secure HTTPS MCP
+endpoint and the current OpenAI MCP authorization flow; V0 source includes the
+portable plugin package but does not choose a new external host or identity
+provider.
+
+The checked 15-case utterance suite is a set of golden behavioral
+specifications/fixtures for intended tool sequences. It does not execute a
+model; actual model-selection evaluation remains blocked until the MCP server
+can be connected to ChatGPT developer mode.

@@ -85,6 +85,10 @@ Relationships:
     PK (target_object_id, tag_object_id)
 
 Adding an existing tag is idempotent. Removing a missing tag is harmless.
+Replacing an object's tag set is a complete replacement of the target's
+Classification-owned tag assignments. It validates that every supplied Tag ID
+is an existing active Tag before changing assignments, and applies the complete
+replacement atomically.
 
 ## Interface
 
@@ -102,6 +106,7 @@ Adding an existing tag is idempotent. Removing a missing tag is harmless.
 - list_tags
 - add_object_tag
 - remove_object_tag
+- replace_object_tags
 - get_object_classification
 - list_category_members
 - list_tag_members
@@ -111,6 +116,8 @@ Category update may change active name, color, and sort_order. Tag update may re
 Category listing supports status and bounded pagination ordered by sort_order, lower(name), object_id. Tag listing uses lower(name), object_id.
 
 New assignments require active category/tag objects. Existing archived assignments remain readable and removable.
+Complete tag replacement likewise requires all supplied Tags to be active and
+does not partially apply when any supplied Tag is missing or archived.
 
 get_object_classification returns the target's category, if any, and assigned tags, including archived assigned classification.
 

@@ -213,3 +213,18 @@ Consequences:
 - No `assistant_today`, household-board cache table, generic event store, GraphQL-like query layer, worker, queue, or polling agent is introduced.
 - Task completion still goes through Tasks; pin/unpin still goes through Attention.
 - The tablet board's staged Undo is a UI concern that delays issuing a durable module command rather than creating a compensating transaction system.
+
+## 2026-09-27 — MCP Presents Assistant Capabilities to AI Agents
+
+**Status:** Accepted
+
+The Assistant.AI Plugin/MCP integration owns how existing Assistant capabilities are presented to ChatGPT and other AI agents. It is an adapter, not a new domain module. Existing modules retain state ownership and invariant enforcement.
+
+The V0 MCP surface exposes goal-oriented tools for Tasks, Knowledge, Scheduling, Reminders, Recurrence, Classification, Attention, and Projection. Write tools require stable object identities; search/read tools help the model resolve identity first. The adapter does not expose arbitrary SQL, arbitrary Edge Function dispatch, Object Registry creation, private Recurrence bookkeeping, or Coach.AI operations.
+
+Consequences:
+- Tool names, descriptions, schemas, and annotations are treated as part of the product.
+- Natural-language interpretation remains the model's responsibility.
+- Due dates remain real Task deadlines, not reminder or surfacing times.
+- Category and Tag tools resolve existing active names only and do not auto-create taxonomy.
+- Published plugin deployment requires a secure HTTPS MCP endpoint and current OpenAI MCP authentication; the repository does not introduce a new hosting or identity-provider decision in this package.

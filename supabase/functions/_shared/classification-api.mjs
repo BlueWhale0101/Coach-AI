@@ -2,7 +2,7 @@ export const CLASSIFICATION_OPERATIONS = [
   "create_category", "update_category", "archive_category", "get_category", "list_categories",
   "set_object_category", "clear_object_category",
   "create_tag", "update_tag", "archive_tag", "get_tag", "list_tags",
-  "add_object_tag", "remove_object_tag", "get_object_classification",
+  "add_object_tag", "remove_object_tag", "replace_object_tags", "get_object_classification",
   "list_category_members", "list_tag_members",
 ];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -71,6 +71,14 @@ function targetAnd(kind, body) {
   only(body, ["target_object_id", `${kind}_object_id`]);
   return [id(body.target_object_id, "target_object_id"), id(body[`${kind}_object_id`], `${kind}_object_id`)];
 }
+function targetAndTagSet(body) {
+  only(body, ["target_object_id", "tag_object_ids"]);
+  if (!Array.isArray(body.tag_object_ids)) bad("VALIDATION_ERROR", "tag_object_ids", "must be an array of UUIDs");
+  return [
+    id(body.target_object_id, "target_object_id"),
+    body.tag_object_ids.map((value, index) => id(value, `tag_object_ids[${index}]`)),
+  ];
+}
 
 export function createClassificationHandler({ operation, repository, actionSecret, databaseConfigured = true }) {
   if (!CLASSIFICATION_OPERATIONS.includes(operation)) throw new Error(`Unknown Classification operation: ${operation}`);
@@ -115,6 +123,7 @@ export function createClassificationHandler({ operation, repository, actionSecre
       }
       if (operation === "add_object_tag") { const args = targetAnd("tag", body); data = { classification: await repository.addObjectTag(...args) }; }
       if (operation === "remove_object_tag") { const args = targetAnd("tag", body); data = { classification: await repository.removeObjectTag(...args) }; }
+      if (operation === "replace_object_tags") { const args = targetAndTagSet(body); data = { classification: await repository.replaceObjectTags(...args) }; }
       if (operation === "get_object_classification") { only(body, ["target_object_id"]); data = { classification: await repository.getObjectClassification(id(body.target_object_id, "target_object_id")) }; }
       if (operation === "list_category_members" || operation === "list_tag_members") {
         const kind = operation === "list_category_members" ? "category" : "tag";
