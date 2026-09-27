@@ -7,6 +7,7 @@ import { callAssistantTool } from "./adapters.mjs";
 import { TOOL_DEFINITIONS } from "./tool-definitions.mjs";
 
 export const SERVER_INFO = { name: "assistant-ai-mcp", version: "0.1.0" };
+export const MCP_HTTP_HOST = "127.0.0.1";
 export const SERVER_INSTRUCTIONS =
   "Assistant.AI tools present household state capabilities. Search before mutating when object identity is unknown. Writes require stable object_id values. Do not invent due dates for reminders or board surfacing.";
 
@@ -114,9 +115,18 @@ export function createAssistantMcpHttpServer({
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const port = Number(process.env.PORT || 8787);
-  createAssistantMcpHttpServer().listen(port, () => {
-    console.error(`Assistant.AI MCP server listening on http://127.0.0.1:${port}/mcp`);
+export function startAssistantMcpHttpServer({
+  edge = createEdgeFunctionClient(),
+  port = Number(process.env.PORT || 8787),
+  log = console.error,
+} = {}) {
+  const server = createAssistantMcpHttpServer({ edge });
+  server.listen(port, MCP_HTTP_HOST, () => {
+    log(`Assistant.AI MCP server listening on http://${MCP_HTTP_HOST}:${port}/mcp`);
   });
+  return server;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startAssistantMcpHttpServer();
 }

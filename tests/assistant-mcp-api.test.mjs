@@ -4,7 +4,12 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { callAssistantTool } from "../assistant/mcp/adapters.mjs";
 import { AssistantMcpError } from "../assistant/mcp/edge-client.mjs";
-import { createAssistantMcpServer, SERVER_INSTRUCTIONS } from "../assistant/mcp/server.mjs";
+import {
+  MCP_HTTP_HOST,
+  createAssistantMcpServer,
+  startAssistantMcpHttpServer,
+  SERVER_INSTRUCTIONS,
+} from "../assistant/mcp/server.mjs";
 import { TOOL_DEFINITIONS, TOOL_NAMES } from "../assistant/mcp/tool-definitions.mjs";
 
 const UUIDS = {
@@ -178,6 +183,19 @@ test("MCP SDK server lists and calls tools with structured agent-readable result
     assert.equal(called.content[0].type, "text");
     assert.deepEqual(edge.calls[0], { functionName: "get-household-board", body: { timezone: "Australia/Darwin" } });
   });
+});
+
+test("direct MCP HTTP startup binds localhost instead of all interfaces", async () => {
+  const server = startAssistantMcpHttpServer({ edge: fakeEdge(), port: 0, log: () => {} });
+  await new Promise((resolve) => server.once("listening", resolve));
+  try {
+    const address = server.address();
+    assert.equal(address.address, MCP_HTTP_HOST);
+    assert.notEqual(address.address, "::");
+    assert.notEqual(address.address, "0.0.0.0");
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
 });
 
 test("MCP adapter never maps tools to Coach or direct SQL surfaces", async () => {
