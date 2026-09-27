@@ -170,6 +170,9 @@ verify_jwt = false
 [functions.get-household-board]
 verify_jwt = false
 
+[functions.get-phone-today]
+verify_jwt = false
+
 [functions.get-object-decorations]
 verify_jwt = false
 

@@ -95,6 +95,7 @@ export function normalizeProjectionBoard(board) {
       id: task.object_id,
       object_id: task.object_id,
       title: task.title,
+      status: task.status ?? "open",
       deadlineLabel: dueLabel(task.due_at, now, timezone),
       due_at: task.due_at,
       not_before: task.not_before,
@@ -302,6 +303,17 @@ async function enrichRows(rows, normalizer, options = {}) {
 export async function getBoardSnapshot() {
   if (isFixtureMode()) return getFixtureBoardSnapshot();
   const data = await postApi("/api/household-board", { timezone: DEFAULT_TIMEZONE, task_limit: 15 });
+  return normalizeProjectionBoard(data.board);
+}
+
+export async function getPhoneTodaySnapshot() {
+  if (isFixtureMode()) {
+    const board = getFixtureBoardSnapshot();
+    board.tasks = board.tasks.map(task => ({ ...task, status: "open", surface_reason: task.deadlineLabel ? "due_soon" : "actionable" }));
+    board.metadata = { today: board.days[0].date };
+    return board;
+  }
+  const data = await postApi("/api/phone-today", { timezone: DEFAULT_TIMEZONE, task_limit: 30 });
   return normalizeProjectionBoard(data.board);
 }
 

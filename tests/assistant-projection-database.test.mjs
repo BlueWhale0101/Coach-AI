@@ -156,3 +156,26 @@ test("Household Board Projection V0 composes Assistant state without durable boa
     assert.equal((await one("select * from public.assistant_create_task('Protected task still works')")).status, "open");
   });
 });
+
+test("phone Today projection composes four Darwin days with explicit service role access", async () => {
+  const first = await event("Sunday at midnight", "2026-09-27T00:15:00+09:30", "2026-09-27T01:00:00+09:30");
+  const later = await event("Tuesday coming up", "2026-09-29T08:00:00+09:30", "2026-09-29T09:00:00+09:30");
+  const result = await one("select public.assistant_get_phone_today($1,'Australia/Darwin',$2,30) as board", ["2026-09-27", "2026-09-27T00:00:00+09:30"]);
+  assert.deepEqual(result.board.days.map(day => day.date), ["2026-09-27", "2026-09-28", "2026-09-29", "2026-09-30"]);
+  assert.ok(result.board.days[0].timed_events.some(item => item.object_id === first.object_id));
+  assert.ok(result.board.days[2].timed_events.some(item => item.object_id === later.object_id));
+  const signature = "public.assistant_get_phone_today(date,text,timestamptz,integer)";
+  assert.equal((await one("select prosecdef from pg_proc where oid=$1::regprocedure", [signature])).prosecdef, false);
+  for (const role of ["anon", "authenticated"]) {
+    assert.equal((await one("select has_function_privilege($1,$2,'EXECUTE') allowed", [role, signature])).allowed, false);
+    await db.exec(`set role ${role}`);
+    try { await assert.rejects(() => rows("select public.assistant_get_phone_today(null,'Australia/Darwin',now(),30)"), error => error.code === "42501"); }
+    finally { await db.exec("reset role"); }
+  }
+  assert.equal((await one("select has_function_privilege('service_role',$1,'EXECUTE') allowed", [signature])).allowed, true);
+  await db.exec("set role service_role");
+  try { assert.equal((await one("select public.assistant_get_phone_today(null,'Australia/Darwin',now(),30) as board")).board.days.length, 4); }
+  finally { await db.exec("reset role"); }
+  await assert.rejects(() => rows("select public.assistant_get_phone_today(null,'Invalid/Zone',now(),30)"), error => error.code === "22023");
+  await assert.rejects(() => rows("select public.assistant_get_phone_today(null,'Australia/Darwin',now(),51)"), error => error.code === "22023");
+});

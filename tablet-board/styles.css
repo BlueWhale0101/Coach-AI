@@ -1,12 +1,6 @@
+@import url("../assistant-ui/tokens.css");
+
 :root {
-  --background: #17191C;
-  --surface: #202328;
-  --raised: #292D33;
-  --border: #3A3F47;
-  --text: #F4F5F6;
-  --secondary: #C2C7CE;
-  --muted: #969DA6;
-  --shadow: rgba(0, 0, 0, 0.34);
   --hour: 84px;
   --task-pane-width: 36%;
   --today-pane: 62fr;
