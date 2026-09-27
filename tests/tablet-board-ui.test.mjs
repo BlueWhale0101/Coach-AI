@@ -7,6 +7,15 @@ import {
   parseTimeToMinutes,
   visibleAllDayItems,
 } from "../tablet-board/calendar-layout.mjs";
+import {
+  DEFAULT_DISPLAY_SETTINGS,
+  DISPLAY_SETTINGS_KEY,
+  loadDisplaySettings,
+  normalizeDisplaySettings,
+  pixelsPerHourFor,
+  resetDisplaySettings,
+  saveDisplaySettings,
+} from "../tablet-board/display-settings.mjs";
 
 test("tablet board fixtures stay rich enough to exercise the household UI", () => {
   const snapshot = getFixtureBoardSnapshot();
@@ -33,6 +42,16 @@ test("calendar layout preserves proportional time and minimum short-event height
   assert.equal(shortEvent.top, (10 * 60 / 60) * PIXELS_PER_HOUR);
 });
 
+test("calendar layout can scale visible-hour density without changing temporal order", () => {
+  const [event] = layoutTimedEvents([
+    { id: "morning", title: "Morning", start: "07:00", end: "08:00", categoryId: "home" },
+  ], 56);
+
+  assert.equal(event.top, 7 * 56);
+  assert.equal(event.height, 56);
+  assert.equal(pixelsPerHourFor({ ...DEFAULT_DISPLAY_SETTINGS, visibleHours: 12 }), 56);
+});
+
 test("overlapping timed events divide horizontal space", () => {
   const events = layoutTimedEvents([
     { id: "a", title: "A", start: "09:00", end: "10:00", categoryId: "work" },
@@ -53,4 +72,52 @@ test("all-day events expose two rows and summarize overflow", () => {
 
   assert.equal(result.visible.length, 2);
   assert.equal(result.hiddenCount, 1);
+});
+
+test("display settings default, clamp, persist, and reset locally", () => {
+  const storage = new Map();
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => storage.set(key, value),
+    removeItem: key => storage.delete(key),
+  };
+
+  assert.deepEqual(loadDisplaySettings(localStorage), DEFAULT_DISPLAY_SETTINGS);
+
+  const saved = saveDisplaySettings({
+    textScale: 500,
+    taskSplitPercent: 35.64,
+    visibleHours: 9,
+    startHour: 30,
+    todayWidthPercent: 90,
+    categoryTint: "loud",
+  }, localStorage);
+
+  assert.deepEqual(saved, {
+    textScale: 130,
+    taskSplitPercent: 35.6,
+    visibleHours: 8,
+    startHour: 18,
+    todayWidthPercent: 72,
+    categoryTint: "medium",
+  });
+  assert.equal(JSON.parse(storage.get(DISPLAY_SETTINGS_KEY)).taskSplitPercent, 35.6);
+  assert.deepEqual(loadDisplaySettings(localStorage), saved);
+  assert.deepEqual(resetDisplaySettings(localStorage), DEFAULT_DISPLAY_SETTINGS);
+  assert.equal(storage.has(DISPLAY_SETTINGS_KEY), false);
+});
+
+test("display settings clamp task width while preserving divider precision", () => {
+  assert.equal(normalizeDisplaySettings({ taskSplitPercent: 29.94 }).taskSplitPercent, 30);
+  assert.equal(normalizeDisplaySettings({ taskSplitPercent: 48.19 }).taskSplitPercent, 48);
+  assert.equal(normalizeDisplaySettings({ taskSplitPercent: 42.37 }).taskSplitPercent, 42.4);
+});
+
+test("display settings preserve supported tablet defaults", () => {
+  const settings = normalizeDisplaySettings({});
+  assert.equal(settings.taskSplitPercent, 36);
+  assert.equal(100 - settings.taskSplitPercent, 64);
+  assert.equal(settings.todayWidthPercent, 62);
+  assert.equal(settings.visibleHours, 8);
+  assert.equal(settings.startHour, 7);
 });

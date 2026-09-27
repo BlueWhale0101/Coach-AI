@@ -30,6 +30,10 @@ const assets = {
     type: "text/javascript; charset=utf-8",
     body: await readFile(resolve(root, "tablet-board/data-provider.mjs"), "utf8"),
   },
+  "/tablet-board/display-settings.mjs": {
+    type: "text/javascript; charset=utf-8",
+    body: await readFile(resolve(root, "tablet-board/display-settings.mjs"), "utf8"),
+  },
   "/tablet-board/mutation-staging.mjs": {
     type: "text/javascript; charset=utf-8",
     body: await readFile(resolve(root, "tablet-board/mutation-staging.mjs"), "utf8"),
