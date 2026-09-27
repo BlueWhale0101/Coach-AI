@@ -67,3 +67,14 @@ test("projection authentication, method handling, repository errors, and config 
   const config = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
   assert.match(config, /\[functions\.get-household-board\]\s*verify_jwt\s*=\s*false/);
 });
+
+test("decoration projection validates and deduplicates bounded object IDs", async () => {
+  const id = "10000000-0000-4000-8000-000000000001";
+  const repo = { getObjectDecorations: async ids => ({ [ids[0]]: { pinned: true } }) };
+  const handler = createProjectionHandler({ repository: repo, actionSecret: "secret", operation: "decorations" });
+  const result = await handler(request({ object_ids: [id, id] }));
+  assert.deepEqual((await result.json()).data.decorations, { [id]: { pinned: true } });
+  const bad = await handler(request({ object_ids: ["not-an-id"] }));
+  assert.equal((await bad.json()).code, "VALIDATION_ERROR");
+  assert.equal((await handler(request({ object_ids: [id], other: 1 }))).status, 400);
+});

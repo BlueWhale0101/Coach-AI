@@ -51,7 +51,7 @@ function limit(value) {
   return value;
 }
 
-export function createProjectionHandler({ repository, actionSecret, databaseConfigured = true }) {
+export function createProjectionHandler({ repository, actionSecret, databaseConfigured = true, operation = "board" }) {
   return async request => {
     if (request.method === "OPTIONS") return response({ ok: true });
     if (request.method !== "POST") return fail(new ProjectionApiError("METHOD_NOT_ALLOWED", "Method not allowed", 405));
@@ -62,11 +62,18 @@ export function createProjectionHandler({ repository, actionSecret, databaseConf
     try {
       body = await request.json();
       if (!body || typeof body !== "object" || Array.isArray(body)) throw new ProjectionApiError("VALIDATION_ERROR", "Request body must be an object");
-      only(body, ["display_date", "timezone", "now", "task_limit"]);
+      only(body, operation === "decorations" ? ["object_ids"] : ["display_date", "timezone", "now", "task_limit"]);
     } catch (error) {
       return fail(error instanceof ProjectionApiError ? error : new ProjectionApiError("INVALID_JSON", "Invalid JSON body"));
     }
     try {
+      if (operation === "decorations") {
+        if (!Array.isArray(body.object_ids) || body.object_ids.length > 100 || body.object_ids.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+          throw new ProjectionApiError("VALIDATION_ERROR", "object_ids must be an array of at most 100 UUIDs");
+        }
+        const decorations = await repository.getObjectDecorations([...new Set(body.object_ids)]);
+        return response({ ok: true, data: { decorations } });
+      }
       const board = await repository.getHouseholdBoard({
         display_date: date(body.display_date, "display_date"),
         timezone: text(body.timezone, "timezone", "Australia/Darwin"),

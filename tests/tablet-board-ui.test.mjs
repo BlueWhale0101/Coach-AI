@@ -20,8 +20,11 @@ import {
   computePaneHourPixels,
   pathForRoute,
   routeFromPath,
+  localDateKey,
+  localTimeMinutes,
   startOfWeek,
   weekRange,
+  zonedMidnightUtc,
 } from "../tablet-board/view-helpers.mjs";
 
 test("tablet board fixtures stay rich enough to exercise the household UI", () => {
@@ -148,4 +151,13 @@ test("calendar week helpers use a seven day exclusive range", () => {
   const start = startOfWeek(new Date("2026-09-30T12:00:00Z"));
   assert.equal(weekRange(start).start, "2026-09-27");
   assert.equal(weekRange(start).endExclusive, "2026-10-04");
+});
+
+test("calendar boundaries and current day follow Darwin rather than UTC or browser locale", () => {
+  const instant = new Date("2026-09-26T16:00:00Z"); // Sunday 01:30 in Darwin
+  assert.equal(weekRange(startOfWeek(instant)).start, "2026-09-27");
+  assert.equal(localDateKey(instant), "2026-09-27");
+  assert.equal(localTimeMinutes(instant), 90);
+  assert.equal(zonedMidnightUtc("2026-09-27"), "2026-09-26T14:30:00.000Z");
+  assert.equal(zonedMidnightUtc("2026-10-04"), "2026-10-03T14:30:00.000Z");
 });

@@ -25,4 +25,10 @@ export class SupabaseProjectionRepository {
     if (error) throw translate(error);
     return data;
   }
+
+  async getObjectDecorations(ids) {
+    const { data, error } = await this.client.rpc("assistant_get_object_decorations", { p_object_ids: ids });
+    if (error) throw translate(error);
+    return data;
+  }
 }

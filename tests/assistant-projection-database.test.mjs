@@ -19,6 +19,26 @@ const event = (title, starts, ends) =>
 const allDay = (title, start, end) =>
   one("select * from public.assistant_create_schedule_event($1,$2,'all_day',null,null,null,$3,$4)", [title, `${title} details`, start, end]);
 
+test("batched decorations return category, tags, and pin without exposing public RPC access", async () => {
+  const item = await task("Decorated task");
+  const category = await one("select * from public.assistant_create_category('Decorations','#AABBCC',0)");
+  const tag = await one("select * from public.assistant_create_tag('decoration-test')");
+  await rows("select * from public.assistant_set_object_category($1,$2)", [item.object_id, category.object_id]);
+  await rows("select * from public.assistant_add_object_tag($1,$2)", [item.object_id, tag.object_id]);
+  await rows("select * from public.assistant_pin_object($1)", [item.object_id]);
+  const result = await one("select public.assistant_get_object_decorations($1::uuid[]) as decorations", [[item.object_id]]);
+  assert.equal(result.decorations[item.object_id].classification.category.name, "Decorations");
+  assert.deepEqual(result.decorations[item.object_id].classification.tags.map(entry => entry.name), ["decoration-test"]);
+  assert.equal(result.decorations[item.object_id].pinned, true);
+  await rows("select * from public.assistant_cancel_task($1)", [item.object_id]);
+  await db.exec("set role anon");
+  try {
+    await assert.rejects(() => rows("select public.assistant_get_object_decorations('{}'::uuid[])"), error => error.code === "42501");
+  } finally {
+    await db.exec("reset role");
+  }
+});
+
 test("Household Board Projection V0 composes Assistant state without durable board tables", async t => {
   await t.test("task surfacing, category composition, tags, and calendar windows", async () => {
     const cat = await one("select * from public.assistant_create_category('School','#5DD39E',0)");

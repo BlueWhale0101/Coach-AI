@@ -12,6 +12,7 @@ export const fixtureCategories = {
 export const categories = fixtureCategories;
 
 export const DEFAULT_TIMEZONE = "Australia/Darwin";
+import { zonedMidnightUtc } from "./view-helpers.mjs";
 
 function fixtureCategory(id) {
   return fixtureCategories[id] ?? neutralCategory;
@@ -288,22 +289,14 @@ function normalizeEventRow(event, { timezone = DEFAULT_TIMEZONE, classification 
   };
 }
 
-async function enrichObject(objectId) {
-  const [classificationData, pinData] = await Promise.all([
-    safeApi("/api/get-object-classification", { target_object_id: objectId }, { classification: null }),
-    safeApi("/api/is-object-pinned", { target_object_id: objectId }, { pin: { pinned: false } }),
-  ]);
-  return {
-    classification: classificationData?.classification ?? null,
-    pinned: pinData?.pin ?? { pinned: false },
-  };
-}
-
 async function enrichRows(rows, normalizer, options = {}) {
-  return Promise.all((rows ?? []).map(async (row) => {
-    const enriched = await enrichObject(row.object_id);
-    return normalizer(row, { ...options, ...enriched });
-  }));
+  if (!rows?.length) return [];
+  const ids = [...new Set(rows.map(row => row.object_id))];
+  const batches = [];
+  for (let index = 0; index < ids.length; index += 100) batches.push(ids.slice(index, index + 100));
+  const responses = await Promise.all(batches.map(object_ids => postApi("/api/object-decorations", { object_ids })));
+  const decorations = Object.assign({}, ...responses.map(data => data.decorations ?? {}));
+  return rows.map(row => normalizer(row, { ...options, ...decorations[row.object_id] }));
 }
 
 export async function getBoardSnapshot() {
@@ -382,8 +375,8 @@ export async function listWeekEvents({ weekStart, weekEnd, timezone = DEFAULT_TI
       ...day.events.map(event => ({ ...event, time_kind: "timed", date: day.date, status: "scheduled" })),
     ]);
   }
-  const timedStart = `${weekStart}T00:00:00+00:00`;
-  const timedEnd = `${weekEnd}T00:00:00+00:00`;
+  const timedStart = zonedMidnightUtc(weekStart, timezone);
+  const timedEnd = zonedMidnightUtc(weekEnd, timezone);
   const [timed, allDay] = await Promise.all([
     postApi("/api/list-schedule-events", {
       status: "scheduled",

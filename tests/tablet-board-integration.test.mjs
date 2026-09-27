@@ -99,3 +99,16 @@ test("staged pin/unpin shares the same undo vocabulary", async () => {
   await timers.runAll();
   assert.deepEqual(calls, ["pin"]);
 });
+
+test("a second staged action persists the first and retains Undo for the second", async () => {
+  const timers = fakeTimers();
+  const calls = [];
+  const staging = new StagedMutationController({ timers });
+  staging.stage({ restore: "first", commit: async () => calls.push("first") });
+  staging.stage({ restore: "second", commit: async () => calls.push("second") });
+  await Promise.resolve();
+  assert.deepEqual(calls, ["first"]);
+  assert.equal(staging.undo(), "second");
+  await timers.runAll();
+  assert.deepEqual(calls, ["first"]);
+});

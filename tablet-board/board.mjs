@@ -18,12 +18,14 @@ import {
 import { StagedMutationController } from "./mutation-staging.mjs";
 import { DAY_END_MINUTE, PIXELS_PER_HOUR, formatTime, hourLabels, layoutTimedEvents, minutesToPixels, visibleAllDayItems } from "./calendar-layout.mjs";
 import { VISIBLE_HOUR_OPTIONS, loadDisplaySettings, normalizeDisplaySettings, resetDisplaySettings, saveDisplaySettings, tintAlpha } from "./display-settings.mjs";
-import { addDays, computePaneHourPixels, eventDateKey, isoDate, pathForRoute, routeFromPath, startOfWeek, weekDays, weekRange } from "./view-helpers.mjs";
+import { addDays, computePaneHourPixels, eventDateKey, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, weekDays, weekRange } from "./view-helpers.mjs";
 
 const STAGE_DELAY_MS = 5000;
 const root = document.querySelector("#board-root");
 const undoStrip = document.querySelector("#undo-strip");
 const staging = new StagedMutationController({ delayMs: STAGE_DELAY_MS });
+let searchTimer = null;
+let viewRequest = 0;
 
 const state = {
   route: routeFromPath(location.pathname),
@@ -109,8 +111,9 @@ function applyDisplaySettings() {
   root.style.setProperty("--tomorrow-pane", `${100 - settings.todayWidthPercent}fr`);
 }
 
-function restoreVisibleState(snapshot) {
-  if (state.route === "board") state.snapshot = snapshot;
+function restoreVisibleState(snapshot, route) {
+  if (state.route !== route) return;
+  if (route === "board") state.snapshot = snapshot;
   else state.viewItems = snapshot;
   state.expandedTaskId = null;
   state.expandedItemId = null;
@@ -118,27 +121,41 @@ function restoreVisibleState(snapshot) {
 }
 
 function stageMutation({ message, restore, commit }) {
+  const route = state.route;
+  const mutation = { restore, route };
   staging.stage({
     restore,
     commit,
     onCommit: () => {
-      state.pendingMutation = null;
-      undoStrip.hidden = true;
+      if (state.pendingMutation === mutation) {
+        state.pendingMutation = null;
+        undoStrip.hidden = true;
+      }
+      if (state.route !== route && !state.pendingMutation) {
+        if (state.route === "tasks") loadTaskView({ preserveControls: true });
+        else if (state.route === "knowledge") loadKnowledgeView({ preserveControls: true });
+        else loadCurrentView();
+      }
     },
-    onUndo: restoreVisibleState,
+    onUndo: snapshot => restoreVisibleState(snapshot, route),
     onFailure: (snapshot) => {
-      state.pendingMutation = null;
-      restoreVisibleState(snapshot);
+      const latest = state.pendingMutation === mutation;
+      if (latest) state.pendingMutation = null;
+      // A later action or route change makes the old snapshot stale.
+      if (state.route === route && latest) restoreVisibleState(snapshot, route);
+      else loadCurrentView();
       showMessage("Change was not saved. Please try again.", { error: true });
       hideStripSoon();
     },
   });
-  state.pendingMutation = { restore };
+  state.pendingMutation = mutation;
   showMessage(message, {
     undo: () => {
-      staging.undo();
-      state.pendingMutation = null;
-      undoStrip.hidden = true;
+      if (state.pendingMutation === mutation) {
+        staging.undo();
+        state.pendingMutation = null;
+        undoStrip.hidden = true;
+      }
     },
   });
 }
@@ -323,11 +340,12 @@ function togglePin(item) {
   const collection = isBoard ? state.snapshot.tasks : state.viewItems;
   const found = collection.find(candidate => candidate.id === item.id);
   if (found) found.pinned = !found.pinned;
+  const desiredPinned = Boolean(found?.pinned);
   render();
   stageMutation({
     message: `${found?.pinned ? "Pinned" : "Unpinned"} ${item.title}`,
     restore,
-    commit: () => found?.pinned ? pinObject(item.object_id) : unpinObject(item.object_id),
+    commit: () => desiredPinned ? pinObject(item.object_id) : unpinObject(item.object_id),
   });
 }
 
@@ -388,7 +406,11 @@ function renderAllDay(day) {
     const pill = document.createElement("div");
     pill.className = "all-day-item";
     applyCategoryVars(pill, item, 0.2);
-    pill.innerHTML = `<span>${item.title}</span><small>${item.span ?? ""}</small>`;
+    const title = document.createElement("span");
+    title.textContent = item.title;
+    const span = document.createElement("small");
+    span.textContent = item.span ?? "";
+    pill.append(title, span);
     wrap.appendChild(pill);
   });
   if (hiddenCount) {
@@ -409,7 +431,11 @@ function renderEventCard(event, day) {
   card.style.height = `${event.height}px`;
   card.style.left = `calc(${event.leftPercent}% + 3px)`;
   card.style.width = `calc(${event.widthPercent}% - 6px)`;
-  card.innerHTML = `<strong>${event.title}</strong><span>${day.id === "tomorrow" ? event.start : `${formatTime(event.start)}-${formatTime(event.end)}`}</span>`;
+  const title = document.createElement("strong");
+  title.textContent = event.title;
+  const time = document.createElement("span");
+  time.textContent = day.id === "tomorrow" ? event.start : `${formatTime(event.start)}-${formatTime(event.end)}`;
+  card.append(title, time);
   card.addEventListener("click", (click) => {
     click.stopPropagation();
     state.selectedEventId = state.selectedEventId === event.id ? null : event.id;
@@ -427,7 +453,23 @@ function renderEventPopover() {
   const popover = document.createElement("aside");
   popover.className = "event-popover";
   applyCategoryVars(popover, event, 0.16);
-  popover.innerHTML = `<div><p class="eyebrow">${event.day.label} · ${event.start ? formatTime(event.start) : ""}</p><h2>${event.title}</h2><p>${event.detail || event.description || ""}</p><div class="detail-line">${categoryFor(event).label ? `<strong>${categoryFor(event).label}</strong>` : ""}</div></div>`;
+  const content = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = `${event.day.label} · ${event.start ? formatTime(event.start) : ""}`;
+  const title = document.createElement("h2");
+  title.textContent = event.title;
+  const description = document.createElement("p");
+  description.textContent = event.detail || event.description || "";
+  const detail = document.createElement("div");
+  detail.className = "detail-line";
+  if (categoryFor(event).label) {
+    const category = document.createElement("strong");
+    category.textContent = categoryFor(event).label;
+    detail.appendChild(category);
+  }
+  content.append(eyebrow, title, description, detail);
+  popover.appendChild(content);
   const actions = document.createElement("div");
   actions.className = "task-actions";
   const done = button("Done", "solid-button");
@@ -445,7 +487,17 @@ function renderDay(day) {
   const column = document.createElement("section");
   column.className = `day-column ${day.id}`;
   column.setAttribute("aria-label", `${day.label} calendar`);
-  column.innerHTML = `<header class="day-heading"><div><p class="eyebrow">${day.label}</p><h2>${day.dateLabel}</h2></div></header>`;
+  const heading = document.createElement("header");
+  heading.className = "day-heading";
+  const headingText = document.createElement("div");
+  const label = document.createElement("p");
+  label.className = "eyebrow";
+  label.textContent = day.label;
+  const date = document.createElement("h2");
+  date.textContent = day.dateLabel;
+  headingText.append(label, date);
+  heading.appendChild(headingText);
+  column.appendChild(heading);
   column.appendChild(renderAllDay(day));
   const grid = document.createElement("div");
   grid.className = "day-grid";
@@ -557,6 +609,15 @@ function controlInput({ placeholder, value, onInput }) {
   return input;
 }
 
+function scheduleSearch(route) {
+  clearTimeout(searchTimer);
+  ++viewRequest;
+  searchTimer = setTimeout(() => {
+    searchTimer = null;
+    if (state.route === route) (route === "tasks" ? loadTaskView : loadKnowledgeView)({ preserveControls: true });
+  }, 250);
+}
+
 function selectControl({ value, options, onChange }) {
   const select = document.createElement("select");
   select.className = "view-select";
@@ -578,7 +639,7 @@ function renderTaskView() {
   const controls = document.createElement("div");
   controls.className = "view-controls";
   controls.append(
-    controlInput({ placeholder: "Search tasks", value: state.filters.tasks.query, onInput: value => { state.filters.tasks.query = value; loadTaskView(); } }),
+    controlInput({ placeholder: "Search tasks", value: state.filters.tasks.query, onInput: value => { state.filters.tasks.query = value; scheduleSearch("tasks"); } }),
     selectControl({ value: state.filters.tasks.status, options: [{ label: "Open", value: "open" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }, { label: "All statuses", value: "" }], onChange: value => { state.filters.tasks.status = value; loadTaskView(); } }),
     selectControl({ value: state.filters.tasks.categoryId, options: [{ label: "All categories", value: "" }, ...state.categories.map(category => ({ label: category.name, value: category.object_id }))], onChange: value => { state.filters.tasks.categoryId = value; loadTaskView(); } }),
   );
@@ -652,7 +713,11 @@ function renderWeekCalendar() {
       const pill = document.createElement("div");
       pill.className = "all-day-item";
       applyCategoryVars(pill, event, 0.2);
-      pill.innerHTML = `<span>${event.title}</span><small>${spanForAllDay(event)}</small>`;
+      const title = document.createElement("span");
+      title.textContent = event.title;
+      const span = document.createElement("small");
+      span.textContent = spanForAllDay(event);
+      pill.append(title, span);
       allDay.appendChild(pill);
     });
     column.appendChild(allDay);
@@ -665,11 +730,11 @@ function renderWeekCalendar() {
       line.style.top = `${hour.top}px`;
       dayGrid.appendChild(line);
     });
-    if (key === isoDate(new Date())) {
+    if (key === localDateKey(new Date(), DEFAULT_TIMEZONE)) {
       const now = new Date();
       const line = document.createElement("div");
       line.className = "now-line";
-      line.style.top = `${minutesToPixels(now.getHours() * 60 + now.getMinutes(), currentPixelsPerHour())}px`;
+      line.style.top = `${minutesToPixels(localTimeMinutes(now, DEFAULT_TIMEZONE), currentPixelsPerHour())}px`;
       dayGrid.appendChild(line);
     }
     const timed = state.viewItems.filter(event => event.time_kind === "timed" && eventDateKey(event) === key);
@@ -692,7 +757,7 @@ function renderKnowledgeView() {
   const controls = document.createElement("div");
   controls.className = "view-controls";
   controls.append(
-    controlInput({ placeholder: "Search knowledge", value: state.filters.knowledge.query, onInput: value => { state.filters.knowledge.query = value; loadKnowledgeView(); } }),
+    controlInput({ placeholder: "Search knowledge", value: state.filters.knowledge.query, onInput: value => { state.filters.knowledge.query = value; scheduleSearch("knowledge"); } }),
     selectControl({ value: state.filters.knowledge.categoryId, options: [{ label: "All categories", value: "" }, ...state.categories.map(category => ({ label: category.name, value: category.object_id }))], onChange: value => { state.filters.knowledge.categoryId = value; loadKnowledgeView(); } }),
     selectControl({ value: state.filters.knowledge.tagName, options: [{ label: "All tags", value: "" }, ...state.tags.map(tag => ({ label: tag.name, value: tag.name }))], onChange: value => { state.filters.knowledge.tagName = value; loadKnowledgeView(); } }),
   );
@@ -717,7 +782,14 @@ function renderKnowledgeCard(item) {
   });
   const main = document.createElement("div");
   main.className = "task-main";
-  main.innerHTML = `<div class="task-title-wrap"><h3>${item.title}</h3></div><div class="task-deadline"></div>`;
+  const titleWrap = document.createElement("div");
+  titleWrap.className = "task-title-wrap";
+  const title = document.createElement("h3");
+  title.textContent = item.title;
+  titleWrap.appendChild(title);
+  const deadline = document.createElement("div");
+  deadline.className = "task-deadline";
+  main.append(titleWrap, deadline);
   card.appendChild(main);
   if (expanded) {
     const details = document.createElement("div");
@@ -826,7 +898,9 @@ function renderNavigation() {
 function labeledRange({ label, value, min, max, step = 1, suffix = "", onInput }) {
   const row = document.createElement("label");
   row.className = "setting-row";
-  row.innerHTML = `<span>${label}</span>`;
+  const text = document.createElement("span");
+  text.textContent = label;
+  row.appendChild(text);
   const valueText = document.createElement("span");
   valueText.className = "setting-value";
   valueText.textContent = `${value}${suffix}`;
@@ -936,71 +1010,101 @@ async function loadChromeData() {
 }
 
 async function loadBoard() {
+  const request = ++viewRequest;
   state.loading = true;
   state.error = null;
   render();
   try {
-    state.snapshot = await getBoardSnapshot();
+    const snapshot = await getBoardSnapshot();
+    if (request !== viewRequest || state.route !== "board") return;
+    state.snapshot = snapshot;
   } catch (error) {
+    if (request !== viewRequest || state.route !== "board") return;
     state.error = error;
   } finally {
-    state.loading = false;
-    render();
+    if (request === viewRequest && state.route === "board") {
+      state.loading = false;
+      render();
+    }
   }
 }
 
-async function loadTaskView() {
+function renderListOnly() {
+  const list = document.querySelector(".view-list");
+  if (!list) return render();
+  const fresh = state.route === "tasks" ? renderTaskView() : renderKnowledgeView();
+  list.replaceWith(fresh.querySelector(".view-list"));
+}
+
+async function loadTaskView({ preserveControls = false } = {}) {
+  const request = ++viewRequest;
   state.viewLoading = true;
   state.error = null;
-  render();
+  if (preserveControls) renderListOnly(); else render();
   try {
     await loadChromeData();
-    state.viewItems = await listTaskView(state.filters.tasks);
+    const items = await listTaskView({ ...state.filters.tasks });
+    if (request !== viewRequest || state.route !== "tasks") return;
+    state.viewItems = items;
   } catch (error) {
+    if (request !== viewRequest || state.route !== "tasks") return;
     state.error = error;
   } finally {
-    state.viewLoading = false;
-    state.loading = false;
-    render();
+    if (request === viewRequest && state.route === "tasks") {
+      state.viewLoading = false;
+      state.loading = false;
+      if (preserveControls && !state.error) renderListOnly(); else render();
+    }
   }
 }
 
 async function loadCalendarView() {
+  const request = ++viewRequest;
   state.viewLoading = true;
   state.error = null;
   render();
   try {
     const range = weekRange(state.weekStart);
-    state.viewItems = await listWeekEvents({ weekStart: range.start, weekEnd: range.endExclusive, timezone: DEFAULT_TIMEZONE });
+    const items = await listWeekEvents({ weekStart: range.start, weekEnd: range.endExclusive, timezone: DEFAULT_TIMEZONE });
+    if (request !== viewRequest || state.route !== "calendar") return;
+    state.viewItems = items;
   } catch (error) {
+    if (request !== viewRequest || state.route !== "calendar") return;
     state.error = error;
   } finally {
-    state.viewLoading = false;
-    state.loading = false;
-    render();
+    if (request === viewRequest && state.route === "calendar") {
+      state.viewLoading = false;
+      state.loading = false;
+      render();
+    }
   }
 }
 
-async function loadKnowledgeView() {
+async function loadKnowledgeView({ preserveControls = false } = {}) {
+  const request = ++viewRequest;
   state.viewLoading = true;
   state.error = null;
-  render();
+  if (preserveControls) renderListOnly(); else render();
   try {
     await loadChromeData();
-    state.viewItems = await listKnowledgeView(state.filters.knowledge);
+    const items = await listKnowledgeView({ ...state.filters.knowledge });
+    if (request !== viewRequest || state.route !== "knowledge") return;
+    state.viewItems = items;
   } catch (error) {
+    if (request !== viewRequest || state.route !== "knowledge") return;
     state.error = error;
   } finally {
-    state.viewLoading = false;
-    state.loading = false;
-    render();
+    if (request === viewRequest && state.route === "knowledge") {
+      state.viewLoading = false;
+      state.loading = false;
+      if (preserveControls && !state.error) renderListOnly(); else render();
+    }
   }
 }
 
 async function loadCurrentView() {
-  staging.cancel();
-  state.pendingMutation = null;
-  undoStrip.hidden = true;
+  ++viewRequest;
+  clearTimeout(searchTimer);
   state.expandedItemId = null;
   state.expandedTaskId = null;
   state.selectedEventId = null;

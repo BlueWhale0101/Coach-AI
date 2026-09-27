@@ -28,8 +28,28 @@ export function addDays(date, days) {
   return next;
 }
 
-export function startOfWeek(date = new Date()) {
-  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+export function localDateKey(date = new Date(), timezone = "Australia/Darwin") {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function localTimeMinutes(date = new Date(), timezone = "Australia/Darwin") {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return Number(values.hour) * 60 + Number(values.minute);
+}
+
+export function zonedMidnightUtc(date, timezone = "Australia/Darwin") {
+  const at = Date.parse(`${date}T00:00:00Z`);
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(at));
+  const p = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const offset = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second)) - at;
+  return new Date(at - offset).toISOString();
+}
+
+export function startOfWeek(date = new Date(), timezone = "Australia/Darwin") {
+  const utc = new Date(`${localDateKey(date, timezone)}T00:00:00Z`);
   utc.setUTCDate(utc.getUTCDate() - utc.getUTCDay());
   return utc;
 }
