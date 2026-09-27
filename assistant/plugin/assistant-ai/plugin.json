@@ -1,0 +1,36 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "assistant-ai",
+  "version": "0.1.0",
+  "description": "Conversational Assistant.AI tools for household tasks, knowledge, scheduling, reminders, recurrence, classification, attention, and the household board.",
+  "author": {
+    "name": "Assistant.AI"
+  },
+  "repository": "https://github.com/BlueWhale0101/Coach-AI",
+  "keywords": [
+    "assistant",
+    "household",
+    "tasks",
+    "calendar"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Assistant.AI",
+        "shortDescription": "Control household Assistant.AI state from conversation.",
+        "longDescription": "Use ChatGPT conversation to create and manage Assistant.AI tasks, knowledge, events, reminders, recurrence, categories, tags, pins, and the household board through a standards-based MCP tool surface.",
+        "developerName": "Assistant.AI",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "defaultPrompt": [
+          "Add do the dishes.",
+          "What do I have tomorrow?",
+          "Remember that Susan said we need 30 days notice if we move."
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,267 @@
+const read = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
+const write = { readOnlyHint: false, openWorldHint: false, destructiveHint: false };
+const terminal = { readOnlyHint: false, openWorldHint: false, destructiveHint: true };
+
+const string = (description) => ({ type: "string", description });
+const nullableString = (description) => ({ type: ["string", "null"], description });
+const integer = (description, minimum = 0, maximum = 100) => ({ type: "integer", minimum, maximum, description });
+const uuid = (description) => string(`${description} Must be a stable Assistant object_id UUID; search first if the identity is unknown.`);
+const page = {
+  limit: integer("Maximum number of records to return. Defaults to the owning capability default.", 1, 100),
+  offset: integer("Zero-based pagination offset.", 0, 10000),
+};
+
+function schema(properties, required = []) {
+  return { type: "object", additionalProperties: false, properties, required };
+}
+
+export const TOOL_DEFINITIONS = [
+  {
+    name: "find_tasks",
+    title: "Find tasks",
+    description: "Browse or search Assistant tasks. Use this to resolve a task before calling a write tool. A task is an actionable commitment that can become done.",
+    inputSchema: schema({
+      query: string("Optional text to search task title and description."),
+      status: string("Optional task status: open, completed, or cancelled."),
+      priority: nullableString("Optional priority filter. Null selects tasks without explicit priority."),
+      due_from: string("Optional inclusive ISO timestamp lower bound for real deadlines."),
+      due_to: string("Optional inclusive ISO timestamp upper bound for real deadlines."),
+      actionable_at: string("Optional ISO timestamp for not_before/actionability filtering."),
+      ...page,
+    }),
+    annotations: read,
+  },
+  {
+    name: "get_task",
+    title: "Get task",
+    description: "Retrieve one task by stable object_id after creation, prior context, or lookup.",
+    inputSchema: schema({ object_id: uuid("Task identity.") }, ["object_id"]),
+    annotations: read,
+  },
+  {
+    name: "create_task",
+    title: "Create task",
+    description: "Create an actionable commitment. Do not invent due_at for surfacing or reminders; due_at means failure is late.",
+    inputSchema: schema({
+      title: string("Task title."),
+      description: nullableString("Optional task description."),
+      priority: nullableString("Optional explicit priority: low, normal, high, or null."),
+      not_before: nullableString("Optional ISO timestamp when the task is not actionable before that time."),
+      due_at: nullableString("Optional ISO timestamp for a real deadline, not a reminder time."),
+    }, ["title"]),
+    annotations: write,
+  },
+  {
+    name: "update_task",
+    title: "Update task",
+    description: "Update mutable task-owned fields for a specific task. Requires object_id; do not use vague text here.",
+    inputSchema: schema({
+      object_id: uuid("Task identity."),
+      title: string("Optional replacement title."),
+      description: nullableString("Optional replacement description."),
+      priority: nullableString("Optional replacement priority: low, normal, high, or null."),
+      not_before: nullableString("Optional replacement not_before timestamp or null."),
+      due_at: nullableString("Optional replacement real deadline timestamp or null."),
+    }, ["object_id"]),
+    annotations: write,
+  },
+  {
+    name: "complete_task",
+    title: "Complete task",
+    description: "Mark a specific open task completed. Terminal in V0 and requires a stable object_id; search and clarify before using if identity is ambiguous.",
+    inputSchema: schema({ object_id: uuid("Task identity.") }, ["object_id"]),
+    annotations: terminal,
+  },
+  {
+    name: "cancel_task",
+    title: "Cancel task",
+    description: "Cancel a specific open task the user no longer cares about. Terminal in V0 and requires stable object_id.",
+    inputSchema: schema({ object_id: uuid("Task identity.") }, ["object_id"]),
+    annotations: terminal,
+  },
+  {
+    name: "find_knowledge",
+    title: "Find knowledge",
+    description: "Browse or search durable reference information. Use this to resolve knowledge identity before updating or archiving.",
+    inputSchema: schema({ query: string("Optional text query."), status: string("Optional status: active or archived."), ...page }),
+    annotations: read,
+  },
+  {
+    name: "get_knowledge",
+    title: "Get knowledge",
+    description: "Retrieve one Knowledge item by stable object_id.",
+    inputSchema: schema({ object_id: uuid("Knowledge identity.") }, ["object_id"]),
+    annotations: read,
+  },
+  {
+    name: "remember",
+    title: "Remember",
+    description: "Store durable reference information. Do not use for an actionable commitment that can become done; create a task instead.",
+    inputSchema: schema({ title: string("Compact title."), content: string("Durable reference content.") }, ["title", "content"]),
+    annotations: write,
+  },
+  {
+    name: "update_knowledge",
+    title: "Update knowledge",
+    description: "Update a specific active Knowledge item. Requires object_id obtained from creation, context, or lookup.",
+    inputSchema: schema({ object_id: uuid("Knowledge identity."), title: string("Optional replacement title."), content: string("Optional replacement content.") }, ["object_id"]),
+    annotations: write,
+  },
+  {
+    name: "archive_knowledge",
+    title: "Archive knowledge",
+    description: "Archive a specific Knowledge item so it is no longer treated as current. Terminal in V0.",
+    inputSchema: schema({ object_id: uuid("Knowledge identity.") }, ["object_id"]),
+    annotations: terminal,
+  },
+  {
+    name: "find_events",
+    title: "Find events",
+    description: "Browse calendar events by overlap window or search by text. Events occupy calendar time; use this before changing an existing event.",
+    inputSchema: schema({
+      query: string("Optional text query over event title/description."),
+      status: string("Optional event status: scheduled or cancelled."),
+      timed_overlap_start: string("Optional timed window start timestamp; requires timed_overlap_end."),
+      timed_overlap_end: string("Optional timed window end timestamp; requires timed_overlap_start."),
+      all_day_overlap_start: string("Optional all-day date window start; requires all_day_overlap_end."),
+      all_day_overlap_end: string("Optional all-day date window exclusive end; requires all_day_overlap_start."),
+      ...page,
+    }),
+    annotations: read,
+  },
+  {
+    name: "get_event",
+    title: "Get event",
+    description: "Retrieve one schedule event by stable object_id.",
+    inputSchema: schema({ object_id: uuid("Schedule event identity.") }, ["object_id"]),
+    annotations: read,
+  },
+  {
+    name: "create_event",
+    title: "Create event",
+    description: "Create a calendar event. Timed events need starts_at, ends_at, timezone. All-day events use start_date and exclusive end_date.",
+    inputSchema: schema({
+      title: string("Event title."),
+      description: nullableString("Optional event details."),
+      time_kind: string("timed or all_day."),
+      starts_at: string("Timed event start timestamp."),
+      ends_at: string("Timed event end timestamp."),
+      timezone: string("Timed event display timezone."),
+      start_date: string("All-day event start date."),
+      end_date: string("All-day event exclusive end date."),
+    }, ["title", "time_kind"]),
+    annotations: write,
+  },
+  {
+    name: "update_event",
+    title: "Update event",
+    description: "Update a specific scheduled event. Temporal updates must supply a complete valid timed or all-day replacement.",
+    inputSchema: schema({
+      object_id: uuid("Schedule event identity."),
+      title: string("Optional replacement title."),
+      description: nullableString("Optional replacement description."),
+      time_kind: string("timed or all_day when replacing temporal representation."),
+      starts_at: string("Replacement timed start timestamp."),
+      ends_at: string("Replacement timed end timestamp."),
+      timezone: string("Replacement timed display timezone."),
+      start_date: string("Replacement all-day start date."),
+      end_date: string("Replacement all-day exclusive end date."),
+    }, ["object_id"]),
+    annotations: write,
+  },
+  {
+    name: "cancel_event",
+    title: "Cancel event",
+    description: "Cancel a specific schedule event. Terminal in V0 and requires stable event object_id.",
+    inputSchema: schema({ object_id: uuid("Schedule event identity.") }, ["object_id"]),
+    annotations: terminal,
+  },
+  {
+    name: "set_reminder",
+    title: "Set reminder",
+    description: "Arrange for an existing Assistant object to surface at a time. Reminder time is not a task deadline; do not modify due_at unless the user separately stated a real deadline.",
+    inputSchema: schema({ target_object_id: uuid("Existing target object identity."), remind_at: string("Absolute ISO reminder timestamp.") }, ["target_object_id", "remind_at"]),
+    annotations: write,
+  },
+  {
+    name: "set_recurrence",
+    title: "Set recurrence",
+    description: "Attach a recurrence rule supported by Recurrence V0 to an existing task or event. The model resolves natural language; this tool does not implement new RRULE semantics.",
+    inputSchema: schema({
+      seed_object_id: uuid("Task or schedule event seed identity."),
+      basis: string("calendar or after_completion."),
+      frequency: string("daily, weekly, monthly, or yearly."),
+      interval_count: integer("Positive interval count.", 1, 2147483647),
+      anchor_kind: string("For calendar rules: instant or date."),
+      anchor_at: string("Calendar instant anchor timestamp."),
+      anchor_date: string("Calendar date anchor."),
+      timezone: string("Required for instant calendar and completion-relative rules."),
+      weekdays: { type: ["array", "null"], items: { type: "integer", minimum: 1, maximum: 7 }, description: "Optional ISO weekdays for weekly calendar rules." },
+      seed_occurrence_at: string("Seed occurrence instant; equals anchor_at for instant calendar rules."),
+      seed_occurrence_date: string("Seed occurrence date; equals anchor_date for date calendar rules."),
+    }, ["seed_object_id", "basis", "frequency", "interval_count"]),
+    annotations: write,
+  },
+  {
+    name: "update_recurrence",
+    title: "Update recurrence",
+    description: "Update a specific active recurrence's mutable future rule fields. Requires recurrence object_id.",
+    inputSchema: schema({
+      object_id: uuid("Recurrence identity."),
+      frequency: string("Optional replacement frequency."),
+      interval_count: integer("Optional replacement interval.", 1, 2147483647),
+      timezone: nullableString("Optional replacement timezone where supported."),
+      weekdays: { type: ["array", "null"], items: { type: "integer", minimum: 1, maximum: 7 }, description: "Optional replacement weekday set; null clears selection where supported." },
+    }, ["object_id"]),
+    annotations: write,
+  },
+  {
+    name: "end_recurrence",
+    title: "End recurrence",
+    description: "End a specific recurrence series. Terminal in V0 and does not mutate already materialized tasks or events.",
+    inputSchema: schema({ object_id: uuid("Recurrence identity.") }, ["object_id"]),
+    annotations: terminal,
+  },
+  {
+    name: "set_category",
+    title: "Set category",
+    description: "Set or clear an object's primary category by existing active category name. Does not create categories. Unknown names return UNKNOWN_CATEGORY and no mutation.",
+    inputSchema: schema({ object_id: uuid("Target object identity."), category_name: nullableString("Existing active category name, or null to clear.") }, ["object_id", "category_name"]),
+    annotations: write,
+  },
+  {
+    name: "set_tags",
+    title: "Set tags",
+    description: "Replace an object's complete tag set with exactly these existing active tag names. Does not create tags and never partially applies unknown tags.",
+    inputSchema: schema({ object_id: uuid("Target object identity."), tags: { type: "array", items: { type: "string" }, description: "Complete desired set of existing active tag names." } }, ["object_id", "tags"]),
+    annotations: write,
+  },
+  {
+    name: "pin",
+    title: "Pin object",
+    description: "Keep a specific object prominent on the household board. Pinning is not Task priority and requires stable object_id.",
+    inputSchema: schema({ object_id: uuid("Target object identity.") }, ["object_id"]),
+    annotations: write,
+  },
+  {
+    name: "unpin",
+    title: "Unpin object",
+    description: "Remove explicit board prominence from a specific object. Requires stable object_id.",
+    inputSchema: schema({ object_id: uuid("Target object identity.") }, ["object_id"]),
+    annotations: write,
+  },
+  {
+    name: "get_household_board",
+    title: "Get household board",
+    description: "Read the existing household-board Projection. Use this for questions about the current board rather than reconstructing it from module calls.",
+    inputSchema: schema({
+      display_date: string("Optional local display date."),
+      timezone: string("Optional display timezone."),
+      now: string("Optional current timestamp override."),
+      task_limit: integer("Optional task limit.", 1, 50),
+    }),
+    annotations: read,
+  },
+];
+
+export const TOOL_NAMES = TOOL_DEFINITIONS.map((tool) => tool.name);

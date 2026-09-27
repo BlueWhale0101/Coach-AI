@@ -575,3 +575,51 @@ Forward migration `20260927074730_assistant_projection_household_board_v0.sql`
 adds no tables. It adds only read-only `SECURITY INVOKER` Projection RPCs and
 service-role-only execute grants. Existing Coach and Assistant module
 contracts are unchanged.
+
+---
+
+# Assistant.AI MCP / Plugin Surface — V0
+
+The MCP surface is a server-side conversational adapter over existing Assistant
+Edge Function capabilities. It owns no durable state and exposes no database
+or registry mutation primitive. Tool calls use the owning module capability
+and return agent-facing structured content with stable `object_id` values where
+subsequent mutation may be possible.
+
+The portable plugin package is in `assistant/plugin/assistant-ai`; its bundled
+skill describes the semantic distinctions the model should apply. The MCP
+server implementation is in `assistant/mcp` and supports JSON-RPC MCP methods
+for initialization, tool listing, and tool calls over a streamable HTTP `/mcp`
+endpoint.
+
+V0 exposes these conversational tools:
+
+```text
+find_tasks, get_task, create_task, update_task, complete_task, cancel_task
+find_knowledge, get_knowledge, remember, update_knowledge, archive_knowledge
+find_events, get_event, create_event, update_event, cancel_event
+set_reminder
+set_recurrence, update_recurrence, end_recurrence
+set_category, set_tags
+pin, unpin
+get_household_board
+```
+
+Read tools are annotated read-only. Terminal V0 operations (`complete_task`,
+`cancel_task`, `archive_knowledge`, `cancel_event`, `end_recurrence`) are
+annotated destructive/consequential. Writes require stable object IDs. The MCP
+adapter does not silently resolve vague references before mutation; the model
+must search/read and ask for clarification when identity remains ambiguous.
+
+`set_category` resolves an existing active Category by name or clears with
+`category_name: null`. Unknown category names return `UNKNOWN_CATEGORY` with
+available active categories and perform no mutation. `set_tags` replaces the
+complete tag set with exactly the requested existing active Tags. If any tag
+is unknown, it returns `UNKNOWN_TAG` and performs no partial mutation.
+
+The server calls Assistant Edge Functions with server-side
+`ACTION_API_SECRET`. Browsers never receive the action secret or service-role
+credentials. Published ChatGPT plugin deployment requires a secure HTTPS MCP
+endpoint and the current OpenAI MCP authorization flow; V0 source includes the
+portable plugin package but does not choose a new external host or identity
+provider.

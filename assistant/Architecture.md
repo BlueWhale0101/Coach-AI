@@ -38,6 +38,7 @@ No interface owns the data model.
 - Classification: primary categories, colors, and flexible tags across registered objects.
 - Attention: explicit user-selected prominence/pinning across registered objects.
 - Projection: read-only assembly of independently modeled objects for specific consumption surfaces.
+- MCP / Plugin Surface: safe agent-facing presentation of existing Assistant capabilities.
 - Capture: transformation of external input into operations on durable modules.
 - Entities: durable identity for people/places/things; deferred until demonstrated need.
 
