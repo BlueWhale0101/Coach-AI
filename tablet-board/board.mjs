@@ -1,4 +1,11 @@
-import { categories, getBoardSnapshot } from "./data-provider.mjs";
+import {
+  completeTask as persistCompleteTask,
+  getBoardSnapshot,
+  neutralCategory,
+  pinObject,
+  unpinObject,
+} from "./data-provider.mjs";
+import { StagedMutationController } from "./mutation-staging.mjs";
 import {
   DAY_END_MINUTE,
   PIXELS_PER_HOUR,
@@ -10,18 +17,27 @@ import {
   visibleAllDayItems,
 } from "./calendar-layout.mjs";
 
+const STAGE_DELAY_MS = 5000;
+
 const state = {
-  snapshot: getBoardSnapshot(),
+  snapshot: null,
+  loading: true,
+  error: null,
   expandedTaskId: null,
-  completedTask: null,
+  pendingMutation: null,
   selectedEventId: null,
 };
 
 const root = document.querySelector("#board-root");
 const undoStrip = document.querySelector("#undo-strip");
+const staging = new StagedMutationController({ delayMs: STAGE_DELAY_MS });
 
-function categoryFor(id) {
-  return categories[id] ?? categories.home;
+function clone(value) {
+  return structuredClone(value);
+}
+
+function categoryFor(item) {
+  return item?.category ?? neutralCategory;
 }
 
 function tint(hex, alpha) {
@@ -32,8 +48,8 @@ function tint(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function applyCategoryVars(element, categoryId, alpha = 0.16) {
-  const category = categoryFor(categoryId);
+function applyCategoryVars(element, item, alpha = 0.16) {
+  const category = categoryFor(item);
   element.style.setProperty("--category", category.color);
   element.style.setProperty("--category-tint", tint(category.color, alpha));
 }
@@ -46,11 +62,69 @@ function button(label, className = "ghost-button") {
   return node;
 }
 
+function setStatusStrip(message, { undo, error = false } = {}) {
+  undoStrip.innerHTML = "";
+  undoStrip.hidden = false;
+  undoStrip.classList.toggle("error", error);
+  const text = document.createElement("div");
+  text.className = "undo-message";
+  text.textContent = message;
+  undoStrip.appendChild(text);
+  if (undo) {
+    const undoButton = button("UNDO", "undo-button");
+    undoButton.addEventListener("click", undo);
+    undoStrip.appendChild(undoButton);
+  }
+}
+
+function clearPendingMutation() {
+  staging.cancel();
+  state.pendingMutation = null;
+}
+
+function hideStripSoon() {
+  setTimeout(() => {
+    if (!state.pendingMutation) undoStrip.hidden = true;
+  }, 1600);
+}
+
+function restoreSnapshot(snapshot) {
+  state.snapshot = clone(snapshot);
+  state.expandedTaskId = null;
+  render();
+}
+
+function stageMutation({ message, restore, commit }) {
+  staging.stage({
+    restore,
+    commit,
+    onCommit: () => {
+      state.pendingMutation = null;
+      undoStrip.hidden = true;
+    },
+    onUndo: restoreSnapshot,
+    onFailure: (snapshot) => {
+      state.pendingMutation = null;
+      restoreSnapshot(snapshot);
+      setStatusStrip("Change was not saved. Please try again.", { error: true });
+      hideStripSoon();
+    },
+  });
+  state.pendingMutation = { restore };
+  setStatusStrip(message, {
+    undo: () => {
+      staging.undo();
+      state.pendingMutation = null;
+      undoStrip.hidden = true;
+    },
+  });
+}
+
 function renderTask(task) {
   const card = document.createElement("article");
   card.className = `task-card ${state.expandedTaskId === task.id ? "expanded" : ""} ${task.pinned ? "pinned" : ""}`;
   card.tabIndex = 0;
-  applyCategoryVars(card, task.categoryId);
+  applyCategoryVars(card, task);
 
   const main = document.createElement("div");
   main.className = "task-main";
@@ -98,10 +172,24 @@ function renderTask(task) {
   if (state.expandedTaskId === task.id) {
     const details = document.createElement("div");
     details.className = "task-details";
-    details.innerHTML = `
-      <p>${task.description}</p>
-      <div class="detail-line"><strong>${categoryFor(task.categoryId).label}</strong><span>${task.tags.map((tag) => `#${tag}`).join(" ")}</span></div>
-    `;
+    const description = document.createElement("p");
+    description.textContent = task.description || "";
+    details.appendChild(description);
+
+    const meta = document.createElement("div");
+    meta.className = "detail-line";
+    if (categoryFor(task).label) {
+      const category = document.createElement("strong");
+      category.textContent = categoryFor(task).label;
+      meta.appendChild(category);
+    }
+    if (task.tags.length) {
+      const tags = document.createElement("span");
+      tags.textContent = task.tags.map((tag) => `#${tag}`).join(" ");
+      meta.appendChild(tags);
+    }
+    if (meta.children.length) details.appendChild(meta);
+
     const actions = document.createElement("div");
     actions.className = "task-actions";
     const complete = button("Complete", "solid-button");
@@ -109,7 +197,15 @@ function renderTask(task) {
       event.stopPropagation();
       completeTask(task.id);
     });
-    actions.append(complete, button("Pin"), button("Edit"));
+    const pin = button(task.pinned ? "Unpin" : "Pin");
+    pin.addEventListener("click", (event) => {
+      event.stopPropagation();
+      togglePin(task.id);
+    });
+    const edit = button("Edit");
+    edit.disabled = true;
+    edit.title = "Editing stays in the full Assistant tools for now.";
+    actions.append(complete, pin, edit);
     details.appendChild(actions);
     card.appendChild(details);
   }
@@ -118,31 +214,39 @@ function renderTask(task) {
 }
 
 function completeTask(taskId) {
+  if (!state.snapshot) return;
   const task = state.snapshot.tasks.find((item) => item.id === taskId);
   if (!task) return;
-  state.completedTask = { task, index: state.snapshot.tasks.indexOf(task) };
+  const restore = clone(state.snapshot);
   state.snapshot.tasks = state.snapshot.tasks.filter((item) => item.id !== taskId);
   state.expandedTaskId = null;
   render();
-  showUndo(task);
+  stageMutation({
+    message: `✓ ${task.title} completed`,
+    restore,
+    commit: () => persistCompleteTask(task.object_id),
+  });
 }
 
-function showUndo(task) {
-  undoStrip.innerHTML = "";
-  undoStrip.hidden = false;
-  const message = document.createElement("div");
-  message.className = "undo-message";
-  message.textContent = `✓ ${task.title} completed`;
-  const undo = button("UNDO", "undo-button");
-  undo.addEventListener("click", () => {
-    if (!state.completedTask) return;
-    const { task: restored, index } = state.completedTask;
-    state.snapshot.tasks.splice(index, 0, restored);
-    state.completedTask = null;
-    undoStrip.hidden = true;
-    render();
+function togglePin(taskId) {
+  if (!state.snapshot) return;
+  const task = state.snapshot.tasks.find((item) => item.id === taskId);
+  if (!task) return;
+  const restore = clone(state.snapshot);
+  task.pinned = !task.pinned;
+  render();
+  stageMutation({
+    message: `${task.pinned ? "Pinned" : "Unpinned"} ${task.title}`,
+    restore,
+    commit: () => task.pinned ? pinObject(task.object_id) : unpinObject(task.object_id),
   });
-  undoStrip.append(message, undo);
+}
+
+function renderEmpty(message) {
+  const empty = document.createElement("div");
+  empty.className = "empty-state";
+  empty.textContent = message;
+  return empty;
 }
 
 function renderTasks() {
@@ -160,7 +264,8 @@ function renderTasks() {
   `;
   const list = document.createElement("div");
   list.className = "task-list";
-  state.snapshot.tasks.forEach((task) => list.appendChild(renderTask(task)));
+  if (state.snapshot.tasks.length) state.snapshot.tasks.forEach((task) => list.appendChild(renderTask(task)));
+  else list.appendChild(renderEmpty("Nothing needs attention right now."));
   section.appendChild(list);
   return section;
 }
@@ -172,7 +277,7 @@ function renderAllDay(day) {
   visible.forEach((item) => {
     const pill = document.createElement("div");
     pill.className = "all-day-item";
-    applyCategoryVars(pill, item.categoryId, 0.2);
+    applyCategoryVars(pill, item, 0.2);
     pill.innerHTML = `<span>${item.title}</span><small>${item.span}</small>`;
     wrap.appendChild(pill);
   });
@@ -189,7 +294,7 @@ function renderEventCard(event, day) {
   const card = document.createElement("button");
   card.type = "button";
   card.className = `calendar-event ${day.id === "tomorrow" ? "compact" : ""} ${state.selectedEventId === event.id ? "selected" : ""}`;
-  applyCategoryVars(card, event.categoryId, 0.2);
+  applyCategoryVars(card, event, 0.2);
   card.style.top = `${event.top}px`;
   card.style.height = `${event.height}px`;
   card.style.left = `calc(${event.leftPercent}% + 3px)`;
@@ -215,18 +320,27 @@ function renderEventPopover() {
 
   const popover = document.createElement("aside");
   popover.className = "event-popover";
-  applyCategoryVars(popover, event.categoryId, 0.16);
+  applyCategoryVars(popover, event, 0.16);
+  const category = categoryFor(event);
   popover.innerHTML = `
     <div>
       <p class="eyebrow">${event.day.label} · ${formatTime(event.start)}</p>
       <h2>${event.title}</h2>
       <p>${event.detail}</p>
-      <div class="detail-line"><strong>${categoryFor(event.categoryId).label}</strong><span>${event.location || ""}</span></div>
+      <div class="detail-line">${category.label ? `<strong>${category.label}</strong>` : ""}<span>${event.location || ""}</span></div>
     </div>
   `;
   const actions = document.createElement("div");
   actions.className = "task-actions";
-  actions.append(button("Done", "solid-button"), button("Pin"), button("Edit"));
+  const done = button("Done", "solid-button");
+  done.addEventListener("click", () => {
+    state.selectedEventId = null;
+    render();
+  });
+  const edit = button("Edit");
+  edit.disabled = true;
+  edit.title = "Calendar editing stays in the full Assistant tools for now.";
+  actions.append(done, edit);
   popover.appendChild(actions);
   return popover;
 }
@@ -320,10 +434,52 @@ function setInitialCalendarScroll() {
   }
 }
 
+function renderLoading() {
+  root.innerHTML = "";
+  const loading = document.createElement("main");
+  loading.className = "board-state";
+  loading.textContent = "Loading household board...";
+  root.appendChild(loading);
+}
+
+function renderError() {
+  root.innerHTML = "";
+  const error = document.createElement("main");
+  error.className = "board-state error-state";
+  const message = document.createElement("p");
+  message.textContent = state.error?.message || "The household board could not load.";
+  const retry = button("Retry", "solid-button");
+  retry.addEventListener("click", loadBoard);
+  error.append(message, retry);
+  root.appendChild(error);
+}
+
 function render() {
+  if (state.loading) return renderLoading();
+  if (state.error) return renderError();
   root.innerHTML = "";
   root.append(renderTasks(), renderCalendar());
   requestAnimationFrame(setInitialCalendarScroll);
 }
 
-render();
+async function loadBoard() {
+  clearPendingMutation();
+  undoStrip.hidden = true;
+  state.loading = true;
+  state.error = null;
+  render();
+  try {
+    state.snapshot = await getBoardSnapshot();
+  } catch (error) {
+    state.error = error;
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+window.addEventListener("focus", () => {
+  if (!state.pendingMutation) loadBoard();
+});
+
+loadBoard();

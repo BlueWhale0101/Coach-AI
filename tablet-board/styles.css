@@ -29,6 +29,10 @@ button {
   font: inherit;
 }
 
+button:disabled {
+  opacity: 0.48;
+}
+
 .board-shell {
   width: 100vw;
   height: 100vh;
@@ -100,10 +104,11 @@ button {
 
 .task-list {
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
   display: grid;
   align-content: start;
   gap: 7px;
+  scrollbar-color: #555D69 transparent;
 }
 
 .task-card {
@@ -484,6 +489,11 @@ button {
   font-weight: 800;
 }
 
+.undo-strip.error {
+  border-color: #FF7A59;
+  background: #3A1F1B;
+}
+
 .undo-button {
   border-color: rgba(244, 255, 249, 0.42);
   color: #F4FFF9;
@@ -492,6 +502,33 @@ button {
 
 [hidden] {
   display: none !important;
+}
+
+.board-state,
+.empty-state {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--secondary);
+  font-size: clamp(1rem, 1.4vw, 1.25rem);
+  font-weight: 760;
+  text-align: center;
+}
+
+.board-state {
+  width: 100vw;
+  height: 100vh;
+  background: var(--surface);
+}
+
+.error-state {
+  gap: 16px;
+}
+
+.error-state p {
+  margin: 0;
+  max-width: 620px;
 }
 
 @media (max-width: 900px) {

@@ -1,0 +1,81 @@
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+const headers = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-action-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+export class ProjectionApiError extends Error {
+  constructor(code, message, status = 400, details = {}) {
+    super(message);
+    Object.assign(this, { code, status, details });
+  }
+}
+
+const response = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
+const fail = error => response({ ok: false, error: error.message, code: error.code, details: error.details ?? {} }, error.status);
+
+function only(body, allowed) {
+  const fields = Object.keys(body).filter(key => !allowed.includes(key));
+  if (fields.length) throw new ProjectionApiError("IMMUTABLE_FIELD", "Request contains unsupported projection fields", 400, { fields });
+}
+
+function date(value, field) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || !ISO_DATE.test(value) || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value) {
+    throw new ProjectionApiError("INVALID_DATE", `${field} must be an ISO calendar date`, 400, { field });
+  }
+  return value;
+}
+
+function timestamp(value, field) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || !ISO_TIMESTAMP.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new ProjectionApiError("INVALID_TIMESTAMP", `${field} must be an ISO timestamp with timezone`, 400, { field });
+  }
+  return value;
+}
+
+function text(value, field, fallback) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== "string" || !value.trim()) throw new ProjectionApiError("VALIDATION_ERROR", `${field} must be a non-empty string`, 400, { field });
+  return value.trim();
+}
+
+function limit(value) {
+  if (value === undefined || value === null) return 15;
+  if (!Number.isInteger(value) || value < 1 || value > 50) throw new ProjectionApiError("INVALID_PAGINATION", "task_limit must be an integer from 1 to 50", 400, { field: "task_limit" });
+  return value;
+}
+
+export function createProjectionHandler({ repository, actionSecret, databaseConfigured = true }) {
+  return async request => {
+    if (request.method === "OPTIONS") return response({ ok: true });
+    if (request.method !== "POST") return fail(new ProjectionApiError("METHOD_NOT_ALLOWED", "Method not allowed", 405));
+    if (!actionSecret || !databaseConfigured) return fail(new ProjectionApiError("SERVER_CONFIG_ERROR", "Server configuration is incomplete", 500));
+    const supplied = request.headers.get("x-action-secret")?.trim() || (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (supplied !== actionSecret) return fail(new ProjectionApiError("UNAUTHORIZED", "Unauthorized", 401));
+    let body;
+    try {
+      body = await request.json();
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new ProjectionApiError("VALIDATION_ERROR", "Request body must be an object");
+      only(body, ["display_date", "timezone", "now", "task_limit"]);
+    } catch (error) {
+      return fail(error instanceof ProjectionApiError ? error : new ProjectionApiError("INVALID_JSON", "Invalid JSON body"));
+    }
+    try {
+      const board = await repository.getHouseholdBoard({
+        display_date: date(body.display_date, "display_date"),
+        timezone: text(body.timezone, "timezone", "Australia/Darwin"),
+        now: timestamp(body.now, "now"),
+        task_limit: limit(body.task_limit),
+      });
+      return response({ ok: true, data: { board } });
+    } catch (error) {
+      return fail(error instanceof ProjectionApiError ? error : new ProjectionApiError("DATABASE_ERROR", "The projection could not be loaded", 500));
+    }
+  };
+}

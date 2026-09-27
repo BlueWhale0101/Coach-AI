@@ -37,6 +37,7 @@ No interface owns the data model.
 - Reminders: conditions under which an object should surface.
 - Classification: primary categories, colors, and flexible tags across registered objects.
 - Attention: explicit user-selected prominence/pinning across registered objects.
+- Projection: read-only assembly of independently modeled objects for specific consumption surfaces.
 - Capture: transformation of external input into operations on durable modules.
 - Entities: durable identity for people/places/things; deferred until demonstrated need.
 

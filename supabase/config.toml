@@ -163,3 +163,6 @@ verify_jwt = false
 
 [functions.list-pinned-objects]
 verify_jwt = false
+
+[functions.get-household-board]
+verify_jwt = false

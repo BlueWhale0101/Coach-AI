@@ -198,3 +198,18 @@ Consequences:
 - Pin/unpin is available across registered object types without depending on their private representation.
 - V0 has no ranking, expiration, reason, automatic pinning, or multiple attention levels.
 - The Today/dashboard UI can compose Attention with Tasks, Scheduling, and Classification rather than owning dashboard-specific durable state.
+
+## 2026-09-27 — Projection Owns Cross-Module Read Assembly
+
+**Status:** Accepted
+
+Projection owns how independently modeled Assistant.AI objects are assembled for specific read surfaces. It owns no durable household state and performs no mutations.
+
+The first Projection capability is the household-board read for the tablet UI. It composes Tasks, Scheduling, Classification, and Attention into one board-oriented response. This keeps the frontend from issuing many module reads and reconstructing private module relationships itself while preserving the rule that writes go through the owning module capability.
+
+Consequences:
+- Projection may efficiently query multiple module tables because cross-module read composition is its hidden decision.
+- Projection must remain read-only and must not become a second domain model.
+- No `assistant_today`, household-board cache table, generic event store, GraphQL-like query layer, worker, queue, or polling agent is introduced.
+- Task completion still goes through Tasks; pin/unpin still goes through Attention.
+- The tablet board's staged Undo is a UI concern that delays issuing a durable module command rather than creating a compensating transaction system.
