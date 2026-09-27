@@ -3,11 +3,67 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { node } from "../phone/dom.mjs";
+import { createPhoneLoader } from "../phone/load-view.mjs";
 import { agendaForDay, attentionTasks, phonePath, phoneRoute, shiftDay, taskActions, todayKey, upcomingEvents } from "../phone/view-model.mjs";
 import { getPhoneTodaySnapshot, listTaskView, listWeekEvents } from "../tablet-board/data-provider.mjs";
 import { StagedMutationController } from "../tablet-board/mutation-staging.mjs";
 
 const date = "2026-09-27";
+
+test("out-of-order phone loads cannot mutate or render state for any destination", async () => {
+  for (const route of ["today", "tasks", "knowledge", "calendar"]) {
+    const pending = [];
+    const fetch = () => new Promise(resolve => pending.push(resolve));
+    const state = {
+      route, request: 0, snapshot: { id: "initial" }, items: [{ id: "initial" }],
+      query: { tasks: "", knowledge: "" }, status: "open", category: { tasks: "", knowledge: "" }, day: date,
+    };
+    const results = { busy: false, setAttribute() { this.busy = true; }, removeAttribute() { this.busy = false; }, replaceChildren() { throw new Error("stale response rendered"); } };
+    let renders = 0;
+    const load = createPhoneLoader({
+      state, services: { getPhoneTodaySnapshot: fetch, listTaskView: fetch, listKnowledgeView: fetch, listWeekEvents: fetch },
+      getResults: () => results, renderResults: () => { renders++; }, empty: () => null, shiftDay,
+    });
+    const first = load();
+    const second = load();
+    pending[1](route === "today" ? { id: "B" } : [{ id: "B" }]);
+    await second;
+    pending[0](route === "today" ? { id: "A" } : [{ id: "A" }]);
+    await first;
+    assert.equal(route === "today" ? state.snapshot.id : state.items[0].id, "B");
+    assert.equal(renders, 1, `${route} rendered only request B`);
+    assert.equal(results.busy, false);
+  }
+});
+
+test("a resolved request from a previous route cannot change current phone state", async () => {
+  let finishTasks;
+  const state = { route: "tasks", request: 0, items: [], snapshot: null, query: { tasks: "", knowledge: "" }, status: "open", category: { tasks: "", knowledge: "" } };
+  let renders = 0;
+  const load = createPhoneLoader({
+    state,
+    services: {
+      listTaskView: () => new Promise(resolve => { finishTasks = resolve; }),
+      listKnowledgeView: async () => [{ id: "knowledge" }],
+    },
+    getResults: () => null, renderResults: () => { renders++; }, empty: () => null, shiftDay,
+  });
+  const first = load();
+  state.route = "knowledge";
+  await load();
+  finishTasks([{ id: "stale task" }]);
+  await first;
+  assert.deepEqual(state.items, [{ id: "knowledge" }]);
+  assert.equal(renders, 1);
+
+  state.route = "tasks";
+  const routeOnly = load();
+  state.route = "knowledge";
+  finishTasks([{ id: "wrong route" }]);
+  await routeOnly;
+  assert.deepEqual(state.items, [{ id: "knowledge" }]);
+  assert.equal(renders, 1);
+});
 
 test("phone route and direct loads share the Site while tablet and root stay available", async () => {
   assert.equal(phoneRoute("/phone/"), "today");

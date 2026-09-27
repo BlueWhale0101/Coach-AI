@@ -5,6 +5,7 @@ import {
 } from "../tablet-board/data-provider.mjs";
 import { StagedMutationController } from "../tablet-board/mutation-staging.mjs";
 import { node } from "./dom.mjs";
+import { createPhoneLoader } from "./load-view.mjs";
 import { agendaForDay, attentionTasks, DESTINATIONS, phonePath, phoneRoute, shiftDay, taskActions, todayKey, upcomingEvents } from "./view-model.mjs";
 
 const root = document.querySelector("#phone-root");
@@ -270,21 +271,14 @@ function navigate(route, push = true) {
   showRoute();
   load();
 }
-async function load() {
-  const request = ++state.request;
-  const route = state.route;
-  const results = document.querySelector("#phone-results");
-  if (results) results.setAttribute("aria-busy", "true");
-  try {
-    if (route === "today") state.snapshot = await getPhoneTodaySnapshot();
-    else if (route === "tasks") state.items = await listTaskView({ query: state.query.tasks, status: state.status === "all" ? "" : state.status, categoryId: state.category.tasks });
-    else if (route === "knowledge") state.items = await listKnowledgeView({ query: state.query.knowledge, categoryId: state.category.knowledge });
-    else state.items = await listWeekEvents({ weekStart: state.day, weekEnd: shiftDay(state.day, 1) });
-    if (request === state.request) renderResults();
-  } catch (error) {
-    if (request === state.request && results) results.replaceChildren(empty(error.message || "Could not load Assistant.AI."));
-  } finally { if (request === state.request) results?.removeAttribute("aria-busy"); }
-}
+const load = createPhoneLoader({
+  state,
+  services: { getPhoneTodaySnapshot, listTaskView, listKnowledgeView, listWeekEvents },
+  getResults: () => document.querySelector("#phone-results"),
+  renderResults,
+  empty,
+  shiftDay,
+});
 window.addEventListener("popstate", () => navigate(phoneRoute(location.pathname), false));
 showRoute();
 load();
