@@ -16,6 +16,18 @@ import {
   resetDisplaySettings,
   saveDisplaySettings,
 } from "../tablet-board/display-settings.mjs";
+import {
+  bindTaskDoubleTap,
+  computePaneHourPixels,
+  pathForRoute,
+  routeFromPath,
+  localDateKey,
+  localTimeMinutes,
+  startOfWeek,
+  taskActionsForStatus,
+  weekRange,
+  zonedMidnightUtc,
+} from "../tablet-board/view-helpers.mjs";
 
 test("tablet board fixtures stay rich enough to exercise the household UI", () => {
   const snapshot = getFixtureBoardSnapshot();
@@ -120,4 +132,65 @@ test("display settings preserve supported tablet defaults", () => {
   assert.equal(settings.todayWidthPercent, 62);
   assert.equal(settings.visibleHours, 8);
   assert.equal(settings.startHour, 7);
+});
+
+test("tablet routes support direct navigation and history targets", () => {
+  assert.equal(routeFromPath("/tablet-board/"), "board");
+  assert.equal(routeFromPath("/tablet-board/tasks"), "tasks");
+  assert.equal(routeFromPath("/tablet-board/calendar/"), "calendar");
+  assert.equal(routeFromPath("/tablet-board/knowledge"), "knowledge");
+  assert.equal(routeFromPath("/tablet-board/missing"), "board");
+  assert.equal(pathForRoute("tasks"), "/tablet-board/tasks");
+});
+
+test("board calendar hour scale is derived from the visible pane height", () => {
+  assert.equal(computePaneHourPixels({ paneHeight: 736, visibleHours: 8 }), 80);
+  assert.equal(computePaneHourPixels({ paneHeight: 736, visibleHours: 12 }), 53);
+  assert.equal(computePaneHourPixels({ paneHeight: 260, visibleHours: 12 }), 44);
+});
+
+test("calendar week helpers use a seven day exclusive range", () => {
+  const start = startOfWeek(new Date("2026-09-30T12:00:00Z"));
+  assert.equal(weekRange(start).start, "2026-09-27");
+  assert.equal(weekRange(start).endExclusive, "2026-10-04");
+});
+
+test("calendar boundaries and current day follow Darwin rather than UTC or browser locale", () => {
+  const instant = new Date("2026-09-26T16:00:00Z"); // Sunday 01:30 in Darwin
+  assert.equal(weekRange(startOfWeek(instant)).start, "2026-09-27");
+  assert.equal(localDateKey(instant), "2026-09-27");
+  assert.equal(localTimeMinutes(instant), 90);
+  assert.equal(zonedMidnightUtc("2026-09-27"), "2026-09-26T14:30:00.000Z");
+  assert.equal(zonedMidnightUtc("2026-10-04"), "2026-10-03T14:30:00.000Z");
+});
+
+test("task action policy matches the Tasks V0 lifecycle", () => {
+  assert.deepEqual(taskActionsForStatus("open"), ["complete", "pin", "edit", "cancel"]);
+  assert.deepEqual(taskActionsForStatus("completed"), ["pin", "edit"]);
+  assert.deepEqual(taskActionsForStatus("cancelled"), ["pin", "edit"]);
+  assert.deepEqual(taskActionsForStatus("unknown"), []);
+});
+
+test("double-tap completes open Tasks and Board cards but never terminal Tasks", () => {
+  for (const [status, full, expected] of [
+    ["open", true, true],
+    ["completed", true, false],
+    ["cancelled", true, false],
+    ["open", false, true],
+  ]) {
+    const card = new EventTarget();
+    const task = { status };
+    let completed = 0;
+    let cancelledClick = 0;
+    bindTaskDoubleTap(card, task, {
+      full,
+      complete: received => { assert.equal(received, task); completed++; },
+      cancelClick: () => { cancelledClick++; },
+    });
+    const event = new Event("dblclick", { cancelable: true });
+    card.dispatchEvent(event);
+    assert.equal(completed, Number(expected), `${status}, full=${full}`);
+    assert.equal(cancelledClick, Number(expected));
+    assert.equal(event.defaultPrevented, expected);
+  }
 });

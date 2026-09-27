@@ -11,13 +11,14 @@ export const fixtureCategories = {
 
 export const categories = fixtureCategories;
 
-const DEFAULT_TIMEZONE = "Australia/Darwin";
+export const DEFAULT_TIMEZONE = "Australia/Darwin";
+import { zonedMidnightUtc } from "./view-helpers.mjs";
 
 function fixtureCategory(id) {
   return fixtureCategories[id] ?? neutralCategory;
 }
 
-function localDate(value, timezone = DEFAULT_TIMEZONE) {
+export function localDate(value, timezone = DEFAULT_TIMEZONE) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
@@ -28,7 +29,7 @@ function localDate(value, timezone = DEFAULT_TIMEZONE) {
   return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
-function dateLabel(date, timezone = DEFAULT_TIMEZONE) {
+export function dateLabel(date, timezone = DEFAULT_TIMEZONE) {
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: timezone,
     weekday: "short",
@@ -37,7 +38,7 @@ function dateLabel(date, timezone = DEFAULT_TIMEZONE) {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-function timeLabel(value, timezone = DEFAULT_TIMEZONE) {
+export function timeLabel(value, timezone = DEFAULT_TIMEZONE) {
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: timezone,
     hour: "2-digit",
@@ -46,7 +47,7 @@ function timeLabel(value, timezone = DEFAULT_TIMEZONE) {
   }).format(new Date(value));
 }
 
-function dueLabel(dueAt, now, timezone = DEFAULT_TIMEZONE) {
+export function dueLabel(dueAt, now, timezone = DEFAULT_TIMEZONE) {
   if (!dueAt) return "";
   const dueDate = localDate(dueAt, timezone);
   const today = localDate(now, timezone);
@@ -73,7 +74,7 @@ function spanLabel(event) {
   return event.start_date === endDate ? start : `${start}-${end}`;
 }
 
-function categoryFromProjection(category) {
+export function categoryFromProjection(category) {
   if (!category) return neutralCategory;
   return {
     id: category.object_id,
@@ -217,6 +218,87 @@ async function postApi(path, body = {}) {
   return payload.data;
 }
 
+async function safeApi(path, body = {}, fallback = null) {
+  try {
+    return await postApi(path, body);
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeTaskRow(task, { now = new Date().toISOString(), timezone = DEFAULT_TIMEZONE, classification = null, pinned = false } = {}) {
+  return {
+    id: task.object_id,
+    object_id: task.object_id,
+    title: task.title,
+    description: task.description ?? "",
+    status: task.status,
+    priority: task.priority,
+    due_at: task.due_at,
+    not_before: task.not_before,
+    deadlineLabel: dueLabel(task.due_at, now, timezone),
+    category: categoryFromProjection(classification?.category),
+    tags: (classification?.tags ?? []).map(tag => tag.name),
+    tagObjects: classification?.tags ?? [],
+    pinned: Boolean(pinned?.pinned ?? pinned),
+    created_at: task.created_at,
+    completed_at: task.completed_at,
+    cancelled_at: task.cancelled_at,
+  };
+}
+
+function normalizeKnowledgeRow(item, { classification = null, pinned = false } = {}) {
+  return {
+    id: item.object_id,
+    object_id: item.object_id,
+    title: item.title,
+    content: item.content ?? "",
+    status: item.status,
+    category: categoryFromProjection(classification?.category),
+    tags: (classification?.tags ?? []).map(tag => tag.name),
+    tagObjects: classification?.tags ?? [],
+    pinned: Boolean(pinned?.pinned ?? pinned),
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    archived_at: item.archived_at,
+  };
+}
+
+function normalizeEventRow(event, { timezone = DEFAULT_TIMEZONE, classification = null, pinned = false } = {}) {
+  const timed = event.time_kind === "timed";
+  return {
+    id: event.object_id,
+    object_id: event.object_id,
+    title: event.title,
+    description: event.description ?? "",
+    time_kind: event.time_kind,
+    status: event.status,
+    starts_at: event.starts_at,
+    ends_at: event.ends_at,
+    timezone: event.timezone ?? timezone,
+    start_date: event.start_date,
+    end_date: event.end_date,
+    start: timed ? timeLabel(event.starts_at, timezone) : "",
+    end: timed ? timeLabel(event.ends_at, timezone) : "",
+    date: timed ? localDate(event.starts_at, timezone) : event.start_date,
+    category: categoryFromProjection(classification?.category),
+    tags: (classification?.tags ?? []).map(tag => tag.name),
+    pinned: Boolean(pinned?.pinned ?? pinned),
+    detail: event.description ?? "",
+    location: "",
+  };
+}
+
+async function enrichRows(rows, normalizer, options = {}) {
+  if (!rows?.length) return [];
+  const ids = [...new Set(rows.map(row => row.object_id))];
+  const batches = [];
+  for (let index = 0; index < ids.length; index += 100) batches.push(ids.slice(index, index + 100));
+  const responses = await Promise.all(batches.map(object_ids => postApi("/api/object-decorations", { object_ids })));
+  const decorations = Object.assign({}, ...responses.map(data => data.decorations ?? {}));
+  return rows.map(row => normalizer(row, { ...options, ...decorations[row.object_id] }));
+}
+
 export async function getBoardSnapshot() {
   if (isFixtureMode()) return getFixtureBoardSnapshot();
   const data = await postApi("/api/household-board", { timezone: DEFAULT_TIMEZONE, task_limit: 15 });
@@ -228,6 +310,36 @@ export async function completeTask(objectId) {
   return postApi("/api/complete-task", { object_id: objectId });
 }
 
+export async function updateTask(objectId, patch) {
+  if (isFixtureMode()) return { task: { object_id: objectId, ...patch } };
+  return postApi("/api/update-task", { object_id: objectId, ...patch });
+}
+
+export async function cancelTask(objectId) {
+  if (isFixtureMode()) return { task: { object_id: objectId, status: "cancelled" } };
+  return postApi("/api/cancel-task", { object_id: objectId });
+}
+
+export async function listTaskView({ query = "", status = "open", categoryId = "", limit = 80, offset = 0 } = {}) {
+  if (isFixtureMode()) {
+    const source = getFixtureBoardSnapshot().tasks.map(task => ({ ...task, status: "open" }));
+    return source
+      .filter(task => !query || `${task.title} ${task.description}`.toLowerCase().includes(query.toLowerCase()))
+      .filter(task => !categoryId || task.category?.id === categoryId)
+      .map(task => ({ ...task, tagObjects: task.tags.map(name => ({ name })) }));
+  }
+  const body = { status: status || undefined, limit, offset };
+  const now = new Date().toISOString();
+  if (categoryId) {
+    const filtered = await postApi("/api/category-view", { object_type: "task", category_id: categoryId, status: status || null, query: query.trim() || null, limit, offset });
+    return (filtered.rows ?? []).map(row => normalizeTaskRow(row, { now, timezone: DEFAULT_TIMEZONE, classification: row.classification, pinned: row.pinned }));
+  }
+  const data = query.trim()
+    ? await postApi("/api/search-tasks", { ...body, query: query.trim() })
+    : await postApi("/api/list-tasks", body);
+  return enrichRows(data.tasks, normalizeTaskRow, { now, timezone: DEFAULT_TIMEZONE });
+}
+
 export async function pinObject(objectId) {
   if (isFixtureMode()) return { pin: { target_object_id: objectId, pinned: true, pinned_at: new Date().toISOString() } };
   return postApi("/api/pin-object", { target_object_id: objectId });
@@ -236,4 +348,100 @@ export async function pinObject(objectId) {
 export async function unpinObject(objectId) {
   if (isFixtureMode()) return { pin: { target_object_id: objectId, pinned: false, pinned_at: null } };
   return postApi("/api/unpin-object", { target_object_id: objectId });
+}
+
+export async function listCategories() {
+  if (isFixtureMode()) return Object.values(fixtureCategories).map(category => ({
+    object_id: category.id,
+    name: category.label,
+    color: category.color,
+    status: "active",
+  }));
+  const data = await postApi("/api/list-categories", { status: "active", limit: 100, offset: 0 });
+  return data.categories ?? [];
+}
+
+export async function listTags() {
+  if (isFixtureMode()) return [];
+  const data = await postApi("/api/list-tags", { status: "active", limit: 100, offset: 0 });
+  return data.tags ?? [];
+}
+
+export async function listWeekEvents({ weekStart, weekEnd, timezone = DEFAULT_TIMEZONE } = {}) {
+  if (isFixtureMode()) {
+    return getFixtureBoardSnapshot().days.flatMap(day => [
+      ...day.allDay.map(event => {
+        const end = new Date(`${day.date}T00:00:00Z`);
+        end.setUTCDate(end.getUTCDate() + 1);
+        return { ...event, time_kind: "all_day", start_date: day.date, end_date: end.toISOString().slice(0, 10), date: day.date, status: "scheduled" };
+      }),
+      ...day.events.map(event => ({ ...event, time_kind: "timed", date: day.date, status: "scheduled" })),
+    ]);
+  }
+  const timedStart = zonedMidnightUtc(weekStart, timezone);
+  const timedEnd = zonedMidnightUtc(weekEnd, timezone);
+  const [timed, allDay] = await Promise.all([
+    postApi("/api/list-schedule-events", {
+      status: "scheduled",
+      timed_overlap_start: timedStart,
+      timed_overlap_end: timedEnd,
+      limit: 100,
+      offset: 0,
+    }),
+    postApi("/api/list-schedule-events", {
+      status: "scheduled",
+      all_day_overlap_start: weekStart,
+      all_day_overlap_end: weekEnd,
+      limit: 100,
+      offset: 0,
+    }),
+  ]);
+  const byId = new Map();
+  for (const event of [...(timed.events ?? []), ...(allDay.events ?? [])]) byId.set(event.object_id, event);
+  return enrichRows([...byId.values()], normalizeEventRow, { timezone });
+}
+
+export async function updateEvent(objectId, patch) {
+  if (isFixtureMode()) return { event: { object_id: objectId, ...patch } };
+  return postApi("/api/update-schedule-event", { object_id: objectId, ...patch });
+}
+
+export async function cancelEvent(objectId) {
+  if (isFixtureMode()) return { event: { object_id: objectId, status: "cancelled" } };
+  return postApi("/api/cancel-schedule-event", { object_id: objectId });
+}
+
+export async function listKnowledgeView({ query = "", status = "active", categoryId = "", tagName = "", limit = 80, offset = 0 } = {}) {
+  if (isFixtureMode()) {
+    const items = [
+      { object_id: "knowledge-susan", title: "Susan lease notice", content: "Susan said we need 30 days notice if we move.", status: "active", category: fixtureCategory("home"), tags: ["moving"] },
+      { object_id: "knowledge-school", title: "Preschool receipt rule", content: "The reimbursement form needs the invoice and receipt attached together.", status: "active", category: fixtureCategory("school"), tags: ["paperwork"] },
+      { object_id: "knowledge-health", title: "Migraine refill note", content: "Check both Nurtec and Ubrelvy counts before requesting refills.", status: "active", category: fixtureCategory("health"), tags: ["medicine"] },
+    ];
+    return items
+      .filter(item => !query || `${item.title} ${item.content}`.toLowerCase().includes(query.toLowerCase()))
+      .filter(item => !categoryId || item.category?.id === categoryId)
+      .filter(item => !tagName || item.tags.includes(tagName));
+  }
+  const body = { status: status || undefined, limit, offset };
+  if (categoryId) {
+    const filtered = await postApi("/api/category-view", { object_type: "knowledge", category_id: categoryId, status: status || null, query: query.trim() || null, limit, offset });
+    return (filtered.rows ?? []).map(row => normalizeKnowledgeRow(row, { classification: row.classification, pinned: row.pinned }));
+  }
+  const data = query.trim()
+    ? await postApi("/api/search-knowledge", { ...body, query: query.trim() })
+    : await postApi("/api/list-knowledge", body);
+  const items = await enrichRows(data.knowledge, normalizeKnowledgeRow);
+  return items
+    .filter(item => !tagName || item.tags.includes(tagName));
+}
+
+export async function updateKnowledge(objectId, patch) {
+  if (isFixtureMode()) return { knowledge: { object_id: objectId, ...patch } };
+  return postApi("/api/update-knowledge", { object_id: objectId, ...patch });
+}
+
+export async function archiveKnowledge(objectId) {
+  if (isFixtureMode()) return { knowledge: { object_id: objectId, status: "archived" } };
+  return postApi("/api/archive-knowledge", { object_id: objectId });
 }

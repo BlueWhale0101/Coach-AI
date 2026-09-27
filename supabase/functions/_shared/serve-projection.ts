@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { createProjectionHandler } from "./projection-api.mjs";
 import { SupabaseProjectionRepository } from "./supabase-projection-repository.mjs";
 
-export function serveProjectionOperation() {
+export function serveProjectionOperation(operation = "board") {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
   const key = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
   const configured = Boolean(url && key);
@@ -13,5 +13,6 @@ export function serveProjectionOperation() {
     repository,
     actionSecret: Deno.env.get("ACTION_API_SECRET"),
     databaseConfigured: configured,
+    operation,
   }));
 }

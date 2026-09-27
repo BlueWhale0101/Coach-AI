@@ -51,7 +51,7 @@ function limit(value) {
   return value;
 }
 
-export function createProjectionHandler({ repository, actionSecret, databaseConfigured = true }) {
+export function createProjectionHandler({ repository, actionSecret, databaseConfigured = true, operation = "board" }) {
   return async request => {
     if (request.method === "OPTIONS") return response({ ok: true });
     if (request.method !== "POST") return fail(new ProjectionApiError("METHOD_NOT_ALLOWED", "Method not allowed", 405));
@@ -62,11 +62,40 @@ export function createProjectionHandler({ repository, actionSecret, databaseConf
     try {
       body = await request.json();
       if (!body || typeof body !== "object" || Array.isArray(body)) throw new ProjectionApiError("VALIDATION_ERROR", "Request body must be an object");
-      only(body, ["display_date", "timezone", "now", "task_limit"]);
+      only(body, operation === "decorations" ? ["object_ids"] : operation === "category-list"
+        ? ["object_type", "category_id", "status", "query", "limit", "offset"]
+        : ["display_date", "timezone", "now", "task_limit"]);
     } catch (error) {
       return fail(error instanceof ProjectionApiError ? error : new ProjectionApiError("INVALID_JSON", "Invalid JSON body"));
     }
     try {
+      if (operation === "decorations") {
+        if (!Array.isArray(body.object_ids) || body.object_ids.length > 100 || body.object_ids.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+          throw new ProjectionApiError("VALIDATION_ERROR", "object_ids must be an array of at most 100 UUIDs");
+        }
+        const decorations = await repository.getObjectDecorations([...new Set(body.object_ids)]);
+        return response({ ok: true, data: { decorations } });
+      }
+      if (operation === "category-list") {
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const type = body.object_type;
+        const statuses = type === "task" ? ["open", "completed", "cancelled"] : ["active", "archived"];
+        if (!(["task", "knowledge"].includes(type)) || typeof body.category_id !== "string" || !uuid.test(body.category_id)) {
+          throw new ProjectionApiError("VALIDATION_ERROR", "object_type and category_id are invalid");
+        }
+        if (body.status !== undefined && body.status !== null && !statuses.includes(body.status)) {
+          throw new ProjectionApiError("VALIDATION_ERROR", "status is invalid for this object type");
+        }
+        if (body.query !== undefined && body.query !== null && typeof body.query !== "string") throw new ProjectionApiError("VALIDATION_ERROR", "query must be a string");
+        const query = body.query === undefined || body.query === null || body.query.trim() === "" ? null : body.query.trim();
+        const pageLimit = body.limit ?? 80;
+        const offset = body.offset ?? 0;
+        if (!Number.isInteger(pageLimit) || pageLimit < 1 || pageLimit > 100 || !Number.isInteger(offset) || offset < 0) {
+          throw new ProjectionApiError("INVALID_PAGINATION", "limit must be 1-100 and offset must be non-negative");
+        }
+        const rows = await repository.listCategoryView({ object_type: type, category_id: body.category_id, status: body.status ?? null, query, limit: pageLimit, offset });
+        return response({ ok: true, data: { rows, count: rows.length, limit: pageLimit, offset } });
+      }
       const board = await repository.getHouseholdBoard({
         display_date: date(body.display_date, "display_date"),
         timezone: text(body.timezone, "timezone", "Australia/Darwin"),

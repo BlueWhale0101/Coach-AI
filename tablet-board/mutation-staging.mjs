@@ -3,21 +3,32 @@ export class StagedMutationController {
     this.delayMs = delayMs;
     this.timers = timers;
     this.pending = null;
+    this.commits = Promise.resolve();
+  }
+
+  enqueue(current) {
+    this.commits = this.commits.then(() => current.commit())
+      .then(() => current.onCommit?.(), error => current.onFailure?.(current.restore, error));
+    return this.commits;
   }
 
   stage({ restore, commit, onCommit, onUndo, onFailure }) {
-    this.cancel();
-    const timer = this.timers.setTimeout(async () => {
+    // A second action commits the first; it must never silently discard it.
+    this.flush();
+    const timer = this.timers.setTimeout(() => {
       const current = this.pending;
       this.pending = null;
-      try {
-        await commit();
-        onCommit?.();
-      } catch (error) {
-        onFailure?.(current.restore, error);
-      }
+      return this.enqueue(current);
     }, this.delayMs);
-    this.pending = { restore, timer, onUndo };
+    this.pending = { restore, timer, commit, onCommit, onUndo, onFailure };
+  }
+
+  flush() {
+    if (!this.pending) return;
+    const current = this.pending;
+    this.pending = null;
+    this.timers.clearTimeout(current.timer);
+    this.enqueue(current);
   }
 
   undo() {

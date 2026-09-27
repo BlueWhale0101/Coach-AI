@@ -169,3 +169,9 @@ verify_jwt = false
 
 [functions.get-household-board]
 verify_jwt = false
+
+[functions.get-object-decorations]
+verify_jwt = false
+
+[functions.get-category-view]
+verify_jwt = false

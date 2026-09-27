@@ -37,9 +37,17 @@ button:disabled {
   opacity: 0.48;
 }
 
-.board-shell {
+.app-root {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.board-shell {
+  width: 100%;
+  height: 100%;
   display: grid;
   grid-template-columns: minmax(310px, var(--task-pane-width)) 12px minmax(0, 1fr);
   gap: 0;
@@ -62,6 +70,7 @@ button:disabled {
   grid-template-rows: auto 1fr;
   padding: 14px;
   margin-right: 6px;
+  overflow: hidden;
 }
 
 .calendar-board {
@@ -70,6 +79,7 @@ button:disabled {
   grid-template-rows: auto 1fr;
   padding: 14px 14px 12px;
   margin-left: 6px;
+  overflow: hidden;
 }
 
 .section-header {
@@ -300,6 +310,7 @@ button:disabled {
 
 .task-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
 }
@@ -728,9 +739,121 @@ button:disabled {
 }
 
 .board-state {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   background: var(--surface);
+}
+
+.view-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.app-header {
+  min-height: 56px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 2px;
+}
+
+.app-header h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: calc(clamp(1.55rem, 2vw, 2.05rem) * var(--text-scale));
+  line-height: 1.04;
+}
+
+.view-controls {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(150px, auto) minmax(170px, auto);
+  gap: 9px;
+}
+
+.view-input,
+.view-select {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(1rem * var(--text-scale));
+  font-weight: 720;
+}
+
+.view-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface);
+  scrollbar-color: #555D69 transparent;
+}
+
+.task-view-list .task-card,
+.knowledge-list .task-card {
+  min-height: 64px;
+}
+
+.knowledge-card .task-details p {
+  white-space: pre-wrap;
+}
+
+.calendar-week-shell {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.week-calendar {
+  position: relative;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.week-scroll {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  min-height: calc(96px + (24 * var(--hour)));
+  padding-left: 58px;
+}
+
+.week-day {
+  position: relative;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+}
+
+.week-time-scale {
+  top: 96px;
 }
 
 .error-state {
@@ -761,5 +884,21 @@ button:disabled {
 
   .pane-divider {
     min-width: 10px;
+  }
+
+  .view-shell {
+    padding: 8px;
+  }
+
+  .view-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, auto);
+  }
+
+  .view-controls > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .week-grid {
+    grid-template-columns: repeat(7, minmax(104px, 1fr));
   }
 }
