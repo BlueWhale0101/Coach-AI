@@ -96,12 +96,15 @@ export function createProjectionHandler({ repository, actionSecret, databaseConf
         const rows = await repository.listCategoryView({ object_type: type, category_id: body.category_id, status: body.status ?? null, query, limit: pageLimit, offset });
         return response({ ok: true, data: { rows, count: rows.length, limit: pageLimit, offset } });
       }
-      const board = await repository.getHouseholdBoard({
+      const options = {
         display_date: date(body.display_date, "display_date"),
         timezone: text(body.timezone, "timezone", "Australia/Darwin"),
         now: timestamp(body.now, "now"),
         task_limit: limit(body.task_limit),
-      });
+      };
+      const board = operation === "phone-today"
+        ? await repository.getPhoneToday(options)
+        : await repository.getHouseholdBoard(options);
       return response({ ok: true, data: { board } });
     } catch (error) {
       return fail(error instanceof ProjectionApiError ? error : new ProjectionApiError("DATABASE_ERROR", "The projection could not be loaded", 500));

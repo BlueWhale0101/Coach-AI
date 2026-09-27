@@ -26,6 +26,17 @@ export class SupabaseProjectionRepository {
     return data;
   }
 
+  async getPhoneToday(options) {
+    const { data, error } = await this.client.rpc("assistant_get_phone_today", {
+      p_display_date: options.display_date ?? null,
+      p_timezone: options.timezone,
+      p_now: options.now ?? null,
+      p_task_limit: options.task_limit,
+    });
+    if (error) throw translate(error);
+    return data;
+  }
+
   async getObjectDecorations(ids) {
     const { data, error } = await this.client.rpc("assistant_get_object_decorations", { p_object_ids: ids });
     if (error) throw translate(error);

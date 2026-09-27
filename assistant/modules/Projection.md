@@ -46,6 +46,10 @@ Pinned means "keep this on the household board even if normal surfacing logic wo
 
 The projection accepts an explicit display timezone. Today and Tomorrow are calculated as local dates in that timezone. Timed event windows are the complete two-day local interval converted to instants; all-day event windows use Scheduling's half-open date intervals. Empty time is not returned because the client renders time spatially.
 
+## Phone Today read
+
+`assistant_get_phone_today` reuses the household board's bounded task selection and composes four Darwin-local days through the existing day helper. The phone selects attention-worthy tasks and displays today's schedule plus a few upcoming entries. This read creates no task deadlines or durable phone state. The RPC is `SECURITY INVOKER`, executable by `service_role` only, and reached from the browser through the Site's specific `/api/phone-today` allowlist entry.
+
 ## Mutation boundary
 
 Projection has no mutation endpoint. The tablet board completes Tasks through the Tasks capability and pins/unpins objects through Attention capabilities.
@@ -63,4 +67,4 @@ If either value is absent, the Site fails closed with a configuration error rath
 
 The tablet board may stage fast reversible interactions locally before issuing the durable module command. For completion, the UI removes the task immediately, shows an Undo strip, and waits about five seconds. If Undo is pressed, no database command is sent. If the window expires, the UI calls Tasks `complete-task`. If the write fails, the UI restores the task and reports that the change was not saved.
 
-If the page is closed or navigated during the staging window, V0 chooses the conservative behavior: pending local mutations are dropped and no durable write is attempted.
+In-app navigation keeps the staged mutation pending. A second mutation flushes the first to the owning capability and leaves Undo available for the second. Closing the page during the staging window still discards the local timer; durable offline delivery is outside V0.

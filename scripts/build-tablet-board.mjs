@@ -42,12 +42,21 @@ const assets = {
     type: "text/javascript; charset=utf-8",
     body: await readFile(resolve(root, "tablet-board/view-helpers.mjs"), "utf8"),
   },
+  "/phone/": { type: "text/html; charset=utf-8", body: await readFile(resolve(root, "phone/index.html"), "utf8") },
+  "/phone/index.html": { type: "text/html; charset=utf-8", body: await readFile(resolve(root, "phone/index.html"), "utf8") },
+  "/phone/styles.css": { type: "text/css; charset=utf-8", body: await readFile(resolve(root, "phone/styles.css"), "utf8") },
+  "/phone/phone.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/phone.mjs"), "utf8") },
+  "/phone/dom.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/dom.mjs"), "utf8") },
+  "/phone/load-view.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/load-view.mjs"), "utf8") },
+  "/phone/view-model.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/view-model.mjs"), "utf8") },
+  "/assistant-ui/tokens.css": { type: "text/css; charset=utf-8", body: await readFile(resolve(root, "assistant-ui/tokens.css"), "utf8") },
 };
 
 const worker = `const ASSETS = ${JSON.stringify(assets)};
 
 const ROUTES = {
   "/api/household-board": "get-household-board",
+  "/api/phone-today": "get-phone-today",
   "/api/object-decorations": "get-object-decorations",
   "/api/category-view": "get-category-view",
   "/api/complete-task": "complete-task",
@@ -133,6 +142,12 @@ export default {
     const found = asset(url.pathname);
     if (found) return found;
     if (url.pathname === "/tablet-board") return Response.redirect(new URL("/tablet-board/", url), 308);
+    if (url.pathname === "/phone") {
+      const target = new URL("/phone/", url);
+      target.search = url.search;
+      return Response.redirect(target, 308);
+    }
+    if (url.pathname.startsWith("/phone/")) return asset("/phone/");
     if (url.pathname.startsWith("/tablet-board/")) return asset("/tablet-board/");
     return new Response("Not found", { status: 404 });
   },

@@ -103,3 +103,21 @@ test("projection repository sends bounded category view filters to the read RPC"
     p_query: "word", p_limit: 80, p_offset: 0,
   }]);
 });
+
+test("phone Today projection validates its bounded inputs and calls only its read RPC", async () => {
+  let options;
+  const repo = { getPhoneToday: async value => { options = value; return board; } };
+  const handler = createProjectionHandler({ repository: repo, actionSecret: "secret", operation: "phone-today" });
+  const response = await handler(request({ display_date: "2026-09-27", timezone: "Australia/Darwin", task_limit: 30 }));
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data.board, board);
+  assert.equal(options.display_date, "2026-09-27");
+  assert.equal((await handler(request({ task_limit: 51 }))).status, 400);
+  assert.equal((await handler(request({ object_ids: [] }))).status, 400);
+  const calls = [];
+  const projectionRepo = new SupabaseProjectionRepository({ rpc: async (...args) => { calls.push(args); return { data: board, error: null }; } });
+  await projectionRepo.getPhoneToday({ display_date: null, timezone: "Australia/Darwin", now: null, task_limit: 30 });
+  assert.deepEqual(calls[0], ["assistant_get_phone_today", { p_display_date: null, p_timezone: "Australia/Darwin", p_now: null, p_task_limit: 30 }]);
+  const config = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
+  assert.match(config, /\[functions\.get-phone-today\]\s*verify_jwt\s*=\s*false/);
+});
