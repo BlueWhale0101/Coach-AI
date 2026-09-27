@@ -104,6 +104,11 @@ export default {
     const url = new URL(request.url);
     const functionName = ROUTES[url.pathname];
     if (functionName) return proxy(request, env, functionName);
+    if (url.pathname === "/") {
+      const target = new URL("/tablet-board/", url);
+      target.search = url.search;
+      return Response.redirect(target, 308);
+    }
     const found = asset(url.pathname);
     if (found) return found;
     if (url.pathname === "/tablet-board") return Response.redirect(new URL("/tablet-board/", url), 308);
