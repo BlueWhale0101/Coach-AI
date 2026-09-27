@@ -18,7 +18,7 @@ import {
 import { StagedMutationController } from "./mutation-staging.mjs";
 import { DAY_END_MINUTE, PIXELS_PER_HOUR, formatTime, hourLabels, layoutTimedEvents, minutesToPixels, visibleAllDayItems } from "./calendar-layout.mjs";
 import { VISIBLE_HOUR_OPTIONS, loadDisplaySettings, normalizeDisplaySettings, resetDisplaySettings, saveDisplaySettings, tintAlpha } from "./display-settings.mjs";
-import { addDays, computePaneHourPixels, eventDateKey, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, taskActionsForStatus, weekDays, weekRange } from "./view-helpers.mjs";
+import { addDays, bindTaskDoubleTap, computePaneHourPixels, eventDateKey, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, taskActionsForStatus, weekDays, weekRange } from "./view-helpers.mjs";
 
 const STAGE_DELAY_MS = 5000;
 const root = document.querySelector("#board-root");
@@ -284,11 +284,7 @@ function renderTaskCard(task, { full = false } = {}) {
       render();
     }, 180);
   });
-  card.addEventListener("dblclick", (event) => {
-    event.preventDefault();
-    clearTimeout(clickTimer);
-    completeTask(task);
-  });
+  bindTaskDoubleTap(card, task, { full, complete: completeTask, cancelClick: () => clearTimeout(clickTimer) });
   if (expanded) {
     const details = document.createElement("div");
     details.className = "task-details";

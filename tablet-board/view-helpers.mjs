@@ -82,3 +82,12 @@ export function taskActionsForStatus(status) {
   if (status === "completed" || status === "cancelled") return ["pin", "edit"];
   return [];
 }
+
+export function bindTaskDoubleTap(card, task, { full, complete, cancelClick }) {
+  if (full && task.status !== "open") return;
+  card.addEventListener("dblclick", event => {
+    event.preventDefault();
+    cancelClick();
+    complete(task);
+  });
+}

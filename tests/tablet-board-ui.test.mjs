@@ -17,6 +17,7 @@ import {
   saveDisplaySettings,
 } from "../tablet-board/display-settings.mjs";
 import {
+  bindTaskDoubleTap,
   computePaneHourPixels,
   pathForRoute,
   routeFromPath,
@@ -168,4 +169,28 @@ test("task action policy matches the Tasks V0 lifecycle", () => {
   assert.deepEqual(taskActionsForStatus("completed"), ["pin", "edit"]);
   assert.deepEqual(taskActionsForStatus("cancelled"), ["pin", "edit"]);
   assert.deepEqual(taskActionsForStatus("unknown"), []);
+});
+
+test("double-tap completes open Tasks and Board cards but never terminal Tasks", () => {
+  for (const [status, full, expected] of [
+    ["open", true, true],
+    ["completed", true, false],
+    ["cancelled", true, false],
+    ["open", false, true],
+  ]) {
+    const card = new EventTarget();
+    const task = { status };
+    let completed = 0;
+    let cancelledClick = 0;
+    bindTaskDoubleTap(card, task, {
+      full,
+      complete: received => { assert.equal(received, task); completed++; },
+      cancelClick: () => { cancelledClick++; },
+    });
+    const event = new Event("dblclick", { cancelable: true });
+    card.dispatchEvent(event);
+    assert.equal(completed, Number(expected), `${status}, full=${full}`);
+    assert.equal(cancelledClick, Number(expected));
+    assert.equal(event.defaultPrevented, expected);
+  }
 });
