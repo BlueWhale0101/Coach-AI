@@ -230,6 +230,20 @@ export const TOOL_DEFINITIONS = [
     annotations: write,
   },
   {
+    name: "create_tag",
+    title: "Create tag",
+    description: "Explicitly create a reusable Classification tag. Use its name with set_tags to assign it to tasks; set_tags only accepts existing tags and replaces the complete set.",
+    inputSchema: schema({ name: string("Non-empty tag name.") }, ["name"]),
+    annotations: write,
+  },
+  {
+    name: "get_object_classification",
+    title: "Get object classification",
+    description: "Read an object's current category and tags before replacing its complete tag set with set_tags. Use this when adding a tag while preserving existing tags.",
+    inputSchema: schema({ object_id: uuid("Target object identity.") }, ["object_id"]),
+    annotations: read,
+  },
+  {
     name: "set_tags",
     title: "Set tags",
     description: "Replace an object's complete tag set with exactly these existing active tag names. Does not create tags and never partially applies unknown tags.",

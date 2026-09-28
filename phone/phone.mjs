@@ -1,6 +1,6 @@
 import {
   archiveKnowledge, cancelTask, completeTask, dateLabel, DEFAULT_TIMEZONE,
-  getPhoneTodaySnapshot, listCategories, listKnowledgeView, listTaskView,
+  getPhoneTodaySnapshot, listCategories, listKnowledgeView, listTags, listTaskView,
   listWeekEvents, pinObject, unpinObject, updateKnowledge, updateTask,
 } from "../tablet-board/data-provider.mjs";
 import { StagedMutationController } from "../tablet-board/mutation-staging.mjs";
@@ -14,7 +14,7 @@ const strip = document.querySelector("#phone-undo");
 const staging = new StagedMutationController();
 const state = {
   route: phoneRoute(location.pathname), day: todayKey(), items: [], snapshot: null,
-  categories: [], query: { tasks: "", knowledge: "" }, status: "open",
+  categories: [], tags: [], tag: "", query: { tasks: "", knowledge: "" }, status: "open",
   category: { tasks: "", knowledge: "" }, expanded: null, pending: null,
   request: 0, searchTimer: null,
 };
@@ -132,6 +132,7 @@ function detailCard(item, type) {
     const details = node("div", "card-details");
     const content = type === "task" ? item.description : item.content;
     if (content) details.appendChild(node("p", "detail-text", content));
+    if (type === "task" && item.tags?.length) details.appendChild(node("p", "card-meta", `Tags: ${item.tags.join(" · ")}`));
     const actions = node("div", "actions");
     if (type === "task") {
       const allowed = taskActions(item);
@@ -235,6 +236,11 @@ function searchControls(route) {
   if (route === "tasks") filters.append(filterSelect("Task status", [["open", "Open"], ["completed", "Completed"], ["cancelled", "Cancelled"], ["all", "All"]], state.status, value => { state.status = value; load(); }));
   filters.append(filterSelect("Category", [["", "All categories"], ...state.categories.map(item => [item.object_id, item.name])], state.category[route], value => { state.category[route] = value; load(); }));
   controls.appendChild(filters);
+  if (route === "tasks") {
+    const tagFilter = node("div", "filter-row");
+    tagFilter.append(filterSelect("Tag", [["", "All tags"], ...state.tags.map(item => [item.object_id, item.name])], state.tag, value => { state.tag = value; load(); }));
+    controls.appendChild(tagFilter);
+  }
   return controls;
 }
 function showRoute() {
@@ -288,6 +294,18 @@ listCategories().then(categories => {
   if (!select) return;
   const selected = select.value;
   for (const item of categories) {
+    const option = node("option", "", item.name);
+    option.value = item.object_id;
+    select.appendChild(option);
+  }
+  select.value = selected;
+}).catch(() => {});
+listTags().then(tags => {
+  state.tags = tags;
+  const select = document.querySelector('select[aria-label="Tag"]');
+  if (!select) return;
+  const selected = select.value;
+  for (const item of tags) {
     const option = node("option", "", item.name);
     option.value = item.object_id;
     select.appendChild(option);

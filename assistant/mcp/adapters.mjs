@@ -88,6 +88,11 @@ export async function callAssistantTool(edge, toolName, args = {}) {
     if (toolName === "end_recurrence") return success(await edge.call("end-recurrence", args), "Recurrence ended");
 
     if (toolName === "set_category") return await setCategory(edge, args);
+    if (toolName === "create_tag") {
+      if (typeof args.name !== "string" || !args.name.trim()) return { ok: false, code: "VALIDATION_ERROR", error: "Tag name must be a non-empty string", details: {} };
+      return success(await edge.call("create-tag", { name: args.name.trim() }), "Tag created");
+    }
+    if (toolName === "get_object_classification") return success(await edge.call("get-object-classification", { target_object_id: args.object_id }), "Classification retrieved");
     if (toolName === "set_tags") return await setTags(edge, args);
 
     if (toolName === "pin") return success(await edge.call("pin-object", { target_object_id: args.object_id }), "Object pinned");
@@ -163,5 +168,6 @@ export function expectedToolSequenceByBehavioralFixture() {
     { case: 13, prompt: "Tag this moving and house.", expected_tools: ["set_tags"], notes: "Existing tags only; no partial mutation." },
     { case: 14, prompt: "Move the electrician appointment to Thursday afternoon.", expected_tools: ["find_events", "update_event"], notes: "Resolve event and supply complete time representation." },
     { case: 15, prompt: "Delete/cancel that thing.", expected_tools: ["find_tasks", "find_events"], notes: "Clarify when identity/type is insufficient; no terminal mutation until resolved." },
+    { case: 16, prompt: "Create a tag called Goodbye BBQ and put these six tasks in it.", expected_tools: ["create_tag", "find_tasks", "get_object_classification", "set_tags"], notes: "Resolve each task, preserve its existing active tags, then replace each complete tag set; never put a hashtag in descriptions." },
   ];
 }

@@ -45,6 +45,8 @@ The model performs natural-language interpretation. The MCP adapter validates to
 | `update_recurrence` | write | Recurrence `update-recurrence` |
 | `end_recurrence` | terminal write | Recurrence `end-recurrence` |
 | `set_category` | write | Classification list/clear/set category capabilities |
+| `create_tag` | write | Classification `create-tag` capability |
+| `get_object_classification` | read | Classification `get-object-classification` capability |
 | `set_tags` | write | Classification list tags / replace object tags capabilities |
 | `pin` | write | Attention `pin-object` |
 | `unpin` | write | Attention `unpin-object` |
@@ -70,7 +72,7 @@ Reminders target an existing Assistant object. Setting a reminder does not chang
 
 Recurrence is a friendly adapter over Recurrence V0. It accepts only rule shapes representable by Recurrence V0 and delegates rule validation and calendar arithmetic to Recurrence. It does not expose occurrence listing, completion-relative next calculation, or ledger recording as conversational tools.
 
-Categories and Tags are existing registry objects. `set_category` resolves an active category by case-insensitive name or clears with `null`; it never creates a category. `set_tags` resolves every requested active tag name first. If any requested tag is unknown, no tag assignment changes are applied. After successful name resolution, MCP calls Classification's atomic replacement capability instead of sequencing individual add/remove operations.
+Categories and Tags are existing registry objects. `set_category` resolves an active category by case-insensitive name or clears with `null`; it never creates a category. `create_tag(name)` explicitly creates a reusable Tag through Classification and returns its stable ID and name; duplicate names follow Classification's case-insensitive uniqueness rule. `set_tags` resolves every requested active tag name first. If any requested tag is unknown, no tag assignment changes are applied. After successful name resolution, MCP calls Classification's atomic replacement capability instead of sequencing individual add/remove operations. To add a tag to several tasks, create it once, read each task's current tags with `get_object_classification`, and call `set_tags` for each task with its existing active tag names plus the new one.
 
 Pins keep objects prominent on the household board. Pinning is not Task priority.
 
@@ -94,7 +96,7 @@ The portable plugin package lives in `assistant/plugin/assistant-ai`:
 
 The MCP server uses the official `@modelcontextprotocol/sdk` `McpServer` with the Streamable HTTP transport. OpenAI's current documentation expects production MCP servers to be reachable at stable HTTPS streamable HTTP endpoints, typically `/mcp`, and tools that access private data or actions to be protected by the MCP authorization flow. Developer-mode testing can use a public HTTPS endpoint or Secure MCP Tunnel. If no approved OpenAI-hosted or reviewed MCP host/auth surface is available, deployment stops at this boundary.
 
-The 15 checked conversation cases in this repository are golden behavioral specifications: they assert the intended tool sequence for representative utterances. They do not execute a model. Actual model-selection evaluation remains blocked until the MCP server can be connected to ChatGPT developer mode.
+The checked conversation cases in this repository are golden behavioral specifications: they assert the intended tool sequence for representative utterances. They do not execute a model. Actual model-selection evaluation remains blocked until the MCP server can be connected to ChatGPT developer mode.
 
 ## Deliberate exclusions
 

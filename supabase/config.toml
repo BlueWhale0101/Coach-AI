@@ -181,3 +181,6 @@ verify_jwt = false
 
 [functions.get-category-view]
 verify_jwt = false
+
+[functions.get-tagged-tasks]
+verify_jwt = false

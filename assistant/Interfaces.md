@@ -600,7 +600,7 @@ find_knowledge, get_knowledge, remember, update_knowledge, archive_knowledge
 find_events, get_event, create_event, update_event, cancel_event
 set_reminder
 set_recurrence, update_recurrence, end_recurrence
-set_category, set_tags
+set_category, create_tag, get_object_classification, set_tags
 pin, unpin
 get_household_board
 ```
@@ -613,7 +613,9 @@ must search/read and ask for clarification when identity remains ambiguous.
 
 `set_category` resolves an existing active Category by name or clears with
 `category_name: null`. Unknown category names return `UNKNOWN_CATEGORY` with
-available active categories and perform no mutation. `set_tags` resolves all
+available active categories and perform no mutation. `create_tag(name)` calls
+Classification `create-tag` explicitly and returns the Tag's object ID and name;
+case-insensitive duplicate names are rejected. `set_tags` resolves all
 requested active Tag names first. If any tag is unknown, it returns
 `UNKNOWN_TAG` and performs no mutation. Once names resolve, MCP invokes the
 Classification-owned `replace-object-tags` capability to atomically replace

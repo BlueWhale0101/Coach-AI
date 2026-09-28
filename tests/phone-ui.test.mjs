@@ -16,7 +16,7 @@ test("out-of-order phone loads cannot mutate or render state for any destination
     const fetch = () => new Promise(resolve => pending.push(resolve));
     const state = {
       route, request: 0, snapshot: { id: "initial" }, items: [{ id: "initial" }],
-      query: { tasks: "", knowledge: "" }, status: "open", category: { tasks: "", knowledge: "" }, day: date,
+      query: { tasks: "", knowledge: "" }, status: "open", category: { tasks: "", knowledge: "" }, tag: "", day: date,
     };
     const results = { busy: false, setAttribute() { this.busy = true; }, removeAttribute() { this.busy = false; }, replaceChildren() { throw new Error("stale response rendered"); } };
     let renders = 0;
@@ -79,6 +79,7 @@ test("phone route and direct loads share the Site while tablet and root stay ava
   assert.equal((await request("/tablet-board/tasks")).status, 200);
   assert.equal((await request("/")).status, 308);
   assert.equal((await request("/api/phone-today")).status, 405);
+  assert.equal((await request("/api/tagged-tasks")).status, 405);
   assert.equal((await worker.fetch(new Request("https://assistant.example/api/phone-today", { method: "POST" }), {})).status, 503);
   assert.equal((await request("/api/client/today")).status, 404);
   assert.equal((await request("/api/arbitrary-function")).status, 404);
@@ -157,6 +158,49 @@ test("task lifecycle, category search, and safe text rendering", async () => {
   try { await listTaskView({ query: "  ring ", status: "completed", categoryId: "category-id" }); }
   finally { globalThis.fetch = previousFetch; globalThis.location = previousLocation; }
   assert.deepEqual(calls, [["/api/category-view", { object_type: "task", category_id: "category-id", status: "completed", query: "ring", limit: 80, offset: 0 }]]);
+});
+
+test("phone task tag selection composes filters, clears to All, and keeps decoration batched", async () => {
+  const calls = [];
+  const previousFetch = globalThis.fetch;
+  const previousLocation = globalThis.location;
+  globalThis.location = { search: "" };
+  globalThis.fetch = async (path, options) => {
+    calls.push([path, JSON.parse(options.body)]);
+    return { ok: true, json: async () => ({ ok: true, data: path === "/api/list-tags"
+      ? { tags: [{ object_id: "tag-id", name: "Goodbye BBQ" }], has_more: false }
+      : { rows: [{ object_id: "task-id", title: "Food", status: "open", classification: { category: null, tags: [{ name: "Goodbye BBQ" }] }, pinned: false }] } }) };
+  };
+  try {
+    const { listTags } = await import("../tablet-board/data-provider.mjs");
+    assert.deepEqual((await listTags()).map(tag => tag.name), ["Goodbye BBQ"]);
+    await listTaskView({ query: "food", status: "open", categoryId: "cat-id", tagId: "tag-id", limit: 1 });
+    assert.deepEqual(calls[1], ["/api/tagged-tasks", {
+      tag_id: "tag-id", category_id: "cat-id", status: "open", query: "food", limit: 1, offset: 0,
+    }]);
+    assert.equal(calls.filter(([path]) => path === "/api/object-decorations").length, 0);
+    const source = await readFile(new URL("../phone/phone.mjs", import.meta.url), "utf8");
+    assert.match(source, /filterSelect\("Tag"/);
+    assert.match(source, /\["", "All tags"\]/);
+    assert.match(source, /Tags:.*item\.tags/);
+  } finally { globalThis.fetch = previousFetch; globalThis.location = previousLocation; }
+  const state = { route: "tasks", request: 0, query: { tasks: "food" }, status: "open", category: { tasks: "cat-id" }, tag: "tag-id", items: [] };
+  const options = [];
+  const load = createPhoneLoader({ state, services: { listTaskView: async value => { options.push(value); return []; } },
+    getResults: () => null, renderResults: () => {}, empty: () => null, shiftDay });
+  await load();
+  state.tag = "";
+  await load();
+  assert.deepEqual(options.map(option => option.tagId), ["tag-id", ""]);
+  assert.deepEqual(options.map(option => option.categoryId), ["cat-id", "cat-id"]);
+  const previous = globalThis.location;
+  globalThis.location = { search: "?fixtures=1" };
+  try {
+    const { listTags } = await import("../tablet-board/data-provider.mjs");
+    assert.ok((await listTags()).some(tag => tag.name === "paperwork"));
+    assert.deepEqual((await listTaskView({ tagId: "paperwork" })).map(task => task.object_id), ["task-preschool-form"]);
+    assert.ok((await listTaskView({ tagId: "" })).length > 1);
+  } finally { globalThis.location = previous; }
 });
 
 test("phone fixture Today and staged writes remain available across navigation and rapid actions", async () => {
