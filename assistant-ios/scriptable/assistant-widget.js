@@ -112,13 +112,13 @@ function row(container, item, label, overdue = false) {
   line.centerAlignContent();
   line.spacing = 7;
   createText(line, "●", 8, categoryColor(item));
-  createText(line, item.title, 12, PALETTE.text);
+  createText(line, item.title, 14, PALETTE.text);
   line.addSpacer(4);
-  if (label) createText(line, label, 10, overdue ? PALETTE.overdue : PALETTE.secondary);
+  if (label) createText(line, label, 11, overdue ? PALETTE.overdue : PALETTE.secondary);
 }
 
 function section(widget, title) {
-  createText(widget, title.toUpperCase(), 9, PALETTE.muted, "bold");
+  createText(widget, title.toUpperCase(), 10, PALETTE.muted, "bold");
   widget.addSpacer(5);
 }
 
@@ -149,17 +149,17 @@ function renderWidget(snapshot, mode, { cached = false, now = new Date() } = {})
     icon.imageSize = new Size(12, 13);
     icon.tintColor = new Color(PALETTE.accent);
   }
-  createText(header, `ASSISTANT · ${mode.toUpperCase()}`, 11, PALETTE.text, "bold");
+  createText(header, `ASSISTANT · ${mode.toUpperCase()}`, 12, PALETTE.text, "bold");
   header.addSpacer();
   createText(header, new Intl.DateTimeFormat("en-AU", {
     timeZone: TIMEZONE, day: "numeric", month: "short",
-  }).format(new Date(`${snapshot.date}T12:00:00Z`)), 10, PALETTE.muted);
+  }).format(new Date(`${snapshot.date}T12:00:00Z`)), 11, PALETTE.muted);
   widget.addSpacer(9);
 
   const selected = selectRows(snapshot, mode);
   if (mode !== "calendar") {
     if (mode === "today") section(widget, "Tasks");
-    if (!selected.tasks.length) createText(widget, "Nothing needing attention", 12, PALETTE.secondary);
+    if (!selected.tasks.length) createText(widget, "Nothing needing attention", 14, PALETTE.secondary);
     selected.tasks.forEach((task, index) => {
       if (index) widget.addSpacer(7);
       const label = taskDue(task, snapshot.date, now);
@@ -169,7 +169,7 @@ function renderWidget(snapshot, mode, { cached = false, now = new Date() } = {})
   if (mode === "today") widget.addSpacer(10);
   if (mode !== "tasks") {
     if (mode === "today") section(widget, "Next");
-    if (!selected.events.length) createText(widget, "No upcoming events", 12, PALETTE.secondary);
+    if (!selected.events.length) createText(widget, "No upcoming events", 14, PALETTE.secondary);
     selected.events.forEach((event, index) => {
       if (index) widget.addSpacer(8);
       row(widget, event, eventTime(event, snapshot.date, now));
@@ -179,7 +179,7 @@ function renderWidget(snapshot, mode, { cached = false, now = new Date() } = {})
   widget.addSpacer();
   const footer = widget.addStack();
   const updated = localTime(snapshot.generated_at);
-  createText(footer, `${cached ? "Saved" : "Updated"} ${updated}`, 9, PALETTE.muted);
+  createText(footer, `${cached ? "Saved" : "Updated"} ${updated}`, 10, PALETTE.muted);
   return widget;
 }
 
