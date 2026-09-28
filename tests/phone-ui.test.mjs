@@ -80,6 +80,7 @@ test("phone route and direct loads share the Site while tablet and root stay ava
   assert.equal((await request("/")).status, 308);
   assert.equal((await request("/api/phone-today")).status, 405);
   assert.equal((await worker.fetch(new Request("https://assistant.example/api/phone-today", { method: "POST" }), {})).status, 503);
+  assert.equal((await request("/api/client/today")).status, 404);
   assert.equal((await request("/api/arbitrary-function")).status, 404);
   const script = await readFile(new URL("../phone/phone.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(script, /ASSISTANT_ACTION_API_SECRET|SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE/);

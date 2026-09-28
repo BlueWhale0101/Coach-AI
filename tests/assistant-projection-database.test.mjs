@@ -19,6 +19,24 @@ const event = (title, starts, ends) =>
 const allDay = (title, start, end) =>
   one("select * from public.assistant_create_schedule_event($1,$2,'all_day',null,null,null,$3,$4)", [title, `${title} details`, start, end]);
 
+test("widget credential storage grants service role read only and supports individual revocation", async () => {
+  const table = "public.assistant_widget_client_credentials";
+  for (const role of ["anon", "authenticated"]) {
+    assert.equal((await one("select has_table_privilege($1,$2,'SELECT') as allowed", [role, table])).allowed, false);
+  }
+  assert.equal((await one("select has_table_privilege('service_role',$1,'SELECT') as allowed", [table])).allowed, true);
+  assert.equal((await one("select has_table_privilege('service_role',$1,'INSERT') as allowed", [table])).allowed, false);
+  const hash = "a".repeat(64);
+  await rows("insert into public.assistant_widget_client_credentials (token_hash,label,scope) values ($1,'iPhone','widget:today:read')", [hash]);
+  await db.exec("set role service_role");
+  try {
+    assert.equal((await one("select scope from public.assistant_widget_client_credentials where token_hash = $1", [hash])).scope, "widget:today:read");
+  } finally { await db.exec("reset role"); }
+  await rows("update public.assistant_widget_client_credentials set revoked_at = now() where token_hash = $1", [hash]);
+  assert.ok((await one("select revoked_at from public.assistant_widget_client_credentials where token_hash = $1", [hash])).revoked_at);
+  await assert.rejects(() => rows("insert into public.assistant_widget_client_credentials (token_hash,label,scope) values ($1,'iPhone','tasks:write')", ["b".repeat(64)]));
+});
+
 test("batched decorations return category, tags, and pin without exposing public RPC access", async () => {
   const item = await task("Decorated task");
   const category = await one("select * from public.assistant_create_category('Decorations','#AABBCC',0)");
