@@ -104,6 +104,26 @@ test("projection repository sends bounded category view filters to the read RPC"
   }]);
 });
 
+test("tagged task projection validates combined filters and calls one bounded read RPC", async () => {
+  const tag = "10000000-0000-4000-8000-000000000001";
+  const category = "10000000-0000-4000-8000-000000000002";
+  const calls = [];
+  const repo = new SupabaseProjectionRepository({ rpc: async (...args) => { calls.push(args); return { data: [{ object_id: "task" }], error: null }; } });
+  const handler = createProjectionHandler({ repository: repo, actionSecret: "secret", operation: "tagged-tasks" });
+  const response = await handler(request({ tag_id: tag, category_id: category, status: "open", query: " food ", limit: 1, offset: 3 }));
+  assert.deepEqual((await response.json()).data.rows, [{ object_id: "task" }]);
+  assert.deepEqual(calls, [["assistant_list_tagged_tasks", {
+    p_tag_object_id: tag, p_category_object_id: category, p_status: "open", p_query: "food", p_limit: 1, p_offset: 3,
+  }]]);
+  for (const body of [{ tag_id: "bad" }, { tag_id: tag, category_id: "bad" }, { tag_id: tag, status: "active" },
+    { tag_id: tag, query: 1 }, { tag_id: tag, limit: 101 }, { tag_id: tag, unexpected: true }]) {
+    assert.equal((await handler(request(body))).status, 400);
+  }
+  assert.equal((await handler(request({ tag_id: tag }, "wrong"))).status, 401);
+  const config = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
+  assert.match(config, /\[functions\.get-tagged-tasks\]\s*verify_jwt\s*=\s*false/);
+});
+
 test("phone Today projection validates its bounded inputs and calls only its read RPC", async () => {
   let options;
   const repo = { getPhoneToday: async value => { options = value; return board; } };

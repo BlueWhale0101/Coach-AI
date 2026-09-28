@@ -7,7 +7,7 @@ export function createPhoneLoader({ state, services, getResults, renderResults, 
     try {
       let data;
       if (route === "today") data = await services.getPhoneTodaySnapshot();
-      else if (route === "tasks") data = await services.listTaskView({ query: state.query.tasks, status: state.status === "all" ? "" : state.status, categoryId: state.category.tasks });
+      else if (route === "tasks") data = await services.listTaskView({ query: state.query.tasks, status: state.status === "all" ? "" : state.status, categoryId: state.category.tasks, tagId: state.tag ?? "" });
       else if (route === "knowledge") data = await services.listKnowledgeView({ query: state.query.knowledge, categoryId: state.category.knowledge });
       else data = await services.listWeekEvents({ weekStart: state.day, weekEnd: shiftDay(state.day, 1) });
       if (request !== state.request || route !== state.route) return;

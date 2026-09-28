@@ -63,7 +63,7 @@ test("MCP tool vocabulary is bounded and annotated", () => {
     "find_knowledge", "get_knowledge", "remember", "update_knowledge", "archive_knowledge",
     "find_events", "get_event", "create_event", "update_event", "cancel_event",
     "set_reminder", "set_recurrence", "update_recurrence", "end_recurrence",
-    "set_category", "set_tags", "pin", "unpin", "get_household_board",
+    "set_category", "create_tag", "get_object_classification", "set_tags", "pin", "unpin", "get_household_board",
   ]);
 
   const prohibited = [
@@ -75,7 +75,7 @@ test("MCP tool vocabulary is bounded and annotated", () => {
   ];
   for (const name of prohibited) assert.equal(TOOL_NAMES.includes(name), false);
 
-  const readOnly = ["find_tasks", "get_task", "find_knowledge", "get_knowledge", "find_events", "get_event", "get_household_board"];
+  const readOnly = ["find_tasks", "get_task", "find_knowledge", "get_knowledge", "find_events", "get_event", "get_object_classification", "get_household_board"];
   for (const name of readOnly) {
     const tool = TOOL_DEFINITIONS.find((candidate) => candidate.name === name);
     assert.equal(tool.annotations.readOnlyHint, true, name);
@@ -151,6 +151,28 @@ test("set_tags replaces complete tag set and refuses partial mutation for unknow
   assert.equal(unknown.ok, false);
   assert.equal(unknown.code, "UNKNOWN_TAG");
   assert.deepEqual(unknownEdge.calls.map((call) => call.functionName), ["list-tags"]);
+});
+
+test("create_tag explicitly invokes Classification and returns its stable identity", async () => {
+  const edge = fakeEdge({ "create-tag": { tag: { object_id: UUIDS.tagMoving, name: "Goodbye BBQ" } } });
+  const created = await callAssistantTool(edge, "create_tag", { name: " Goodbye BBQ " });
+  assert.equal(created.ok, true);
+  assert.deepEqual(created.tag, { object_id: UUIDS.tagMoving, name: "Goodbye BBQ" });
+  assert.deepEqual(edge.calls, [{ functionName: "create-tag", body: { name: "Goodbye BBQ" } }]);
+  for (const name of ["", "   ", null]) assert.equal((await callAssistantTool(edge, "create_tag", { name })).code, "VALIDATION_ERROR");
+  assert.equal(edge.calls.length, 1);
+  const duplicate = fakeEdge({ "create-tag": () => { throw new AssistantMcpError("DUPLICATE_NAME", "Classification name already exists", 409); } });
+  assert.equal((await callAssistantTool(duplicate, "create_tag", { name: "goodbye bbq" })).code, "DUPLICATE_NAME");
+  assert.equal(TOOL_DEFINITIONS.find(tool => tool.name === "create_tag").inputSchema.required.includes("name"), true);
+});
+
+test("get_object_classification reads assigned tags before complete replacement", async () => {
+  const edge = fakeEdge({ "get-object-classification": { classification: {
+    target_object_id: UUIDS.task, tags: [{ object_id: UUIDS.tagHouse, name: "House" }], category: null,
+  } } });
+  const result = await callAssistantTool(edge, "get_object_classification", { object_id: UUIDS.task });
+  assert.deepEqual(result.classification.tags.map(tag => tag.name), ["House"]);
+  assert.deepEqual(edge.calls, [{ functionName: "get-object-classification", body: { target_object_id: UUIDS.task } }]);
 });
 
 test("set_tags delegates rollback of backend failures to the atomic Classification capability", async () => {

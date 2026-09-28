@@ -332,18 +332,21 @@ export async function cancelTask(objectId) {
   return postApi("/api/cancel-task", { object_id: objectId });
 }
 
-export async function listTaskView({ query = "", status = "open", categoryId = "", limit = 80, offset = 0 } = {}) {
+export async function listTaskView({ query = "", status = "open", categoryId = "", tagId = "", limit = 80, offset = 0 } = {}) {
   if (isFixtureMode()) {
     const source = getFixtureBoardSnapshot().tasks.map(task => ({ ...task, status: "open" }));
     return source
       .filter(task => !query || `${task.title} ${task.description}`.toLowerCase().includes(query.toLowerCase()))
       .filter(task => !categoryId || task.category?.id === categoryId)
+      .filter(task => !tagId || task.tags.includes(tagId))
       .map(task => ({ ...task, tagObjects: task.tags.map(name => ({ name })) }));
   }
   const body = { status: status || undefined, limit, offset };
   const now = new Date().toISOString();
-  if (categoryId) {
-    const filtered = await postApi("/api/category-view", { object_type: "task", category_id: categoryId, status: status || null, query: query.trim() || null, limit, offset });
+  if (tagId || categoryId) {
+    const filtered = tagId
+      ? await postApi("/api/tagged-tasks", { tag_id: tagId, category_id: categoryId || null, status: status || null, query: query.trim() || null, limit, offset })
+      : await postApi("/api/category-view", { object_type: "task", category_id: categoryId, status: status || null, query: query.trim() || null, limit, offset });
     return (filtered.rows ?? []).map(row => normalizeTaskRow(row, { now, timezone: DEFAULT_TIMEZONE, classification: row.classification, pinned: row.pinned }));
   }
   const data = query.trim()
@@ -374,9 +377,15 @@ export async function listCategories() {
 }
 
 export async function listTags() {
-  if (isFixtureMode()) return [];
-  const data = await postApi("/api/list-tags", { status: "active", limit: 100, offset: 0 });
-  return data.tags ?? [];
+  if (isFixtureMode()) return [...new Set(getFixtureBoardSnapshot().tasks.flatMap(task => task.tags))]
+    .sort((a, b) => a.localeCompare(b)).map(name => ({ object_id: name, name, status: "active" }));
+  const tags = [];
+  for (let offset = 0; offset <= 10000; offset += 100) {
+    const data = await postApi("/api/list-tags", { status: "active", limit: 100, offset });
+    tags.push(...(data.tags ?? []));
+    if (!data.has_more) break;
+  }
+  return tags;
 }
 
 export async function listWeekEvents({ weekStart, weekEnd, timezone = DEFAULT_TIMEZONE } = {}) {

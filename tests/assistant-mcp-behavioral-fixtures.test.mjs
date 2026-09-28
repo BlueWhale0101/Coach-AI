@@ -4,7 +4,7 @@ import { expectedToolSequenceByBehavioralFixture } from "../assistant/mcp/adapte
 
 test("golden behavioral specifications encode intended Assistant.AI tool selection", () => {
   const cases = expectedToolSequenceByBehavioralFixture();
-  assert.equal(cases.length, 15);
+  assert.equal(cases.length, 16);
 
   const byCase = new Map(cases.map((entry) => [entry.case, entry]));
   assert.deepEqual(byCase.get(1).expected_tools, ["create_task"]);
@@ -39,4 +39,6 @@ test("golden behavioral specifications encode intended Assistant.AI tool selecti
   assert.deepEqual(byCase.get(14).expected_tools, ["find_events", "update_event"]);
   assert.deepEqual(byCase.get(15).expected_tools, ["find_tasks", "find_events"]);
   assert.match(byCase.get(15).notes, /no terminal mutation/i);
+  assert.deepEqual(byCase.get(16).expected_tools, ["create_tag", "find_tasks", "get_object_classification", "set_tags"]);
+  assert.match(byCase.get(16).notes, /existing active tags/);
 });

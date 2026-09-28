@@ -92,6 +92,47 @@ test("category view filters before paging for task and knowledge rows", async ()
   await rows("select * from public.assistant_archive_knowledge($1)", [uncategorizedKnowledge.object_id]);
 });
 
+test("tagged task projection composes tag, category, status and search before pagination", async () => {
+  const tagA = await one("select * from public.assistant_create_tag('Goodbye BBQ')");
+  const tagB = await one("select * from public.assistant_create_tag('Cleaning Day')");
+  const category = await one("select * from public.assistant_create_category('Tag test Home','#AABBCC',0)");
+  const other = await task("Food outside list", "2026-01-01T00:00:00Z");
+  const first = await task("Food first", "2026-01-02T00:00:00Z");
+  const second = await task("Food second", "2026-01-03T00:00:00Z");
+  const noCategory = await task("Food no category", "2026-01-04T00:00:00Z");
+  await rows("select public.assistant_set_object_category($1,$2)", [first.object_id, category.object_id]);
+  await rows("select public.assistant_set_object_category($1,$2)", [second.object_id, category.object_id]);
+  for (const item of [first, second, noCategory]) await rows("select public.assistant_add_object_tag($1,$2)", [item.object_id, tagA.object_id]);
+  await rows("select public.assistant_add_object_tag($1,$2)", [first.object_id, tagB.object_id]);
+  const filter = async (tag, cat = null, status = "open", query = null, limit = 100, offset = 0) =>
+    (await one("select public.assistant_list_tagged_tasks($1,$2,$3,$4,$5,$6) as items", [tag, cat, status, query, limit, offset])).items;
+  assert.deepEqual((await filter(tagA.object_id, category.object_id, "open", "food", 1)).map(item => item.object_id), [first.object_id]);
+  assert.deepEqual((await filter(tagA.object_id, category.object_id, "open", "food", 1, 1)).map(item => item.object_id), [second.object_id]);
+  assert.deepEqual((await filter(tagA.object_id, null, "open", "second")).map(item => item.object_id), [second.object_id]);
+  assert.deepEqual((await filter(tagB.object_id)).map(item => item.object_id), [first.object_id]);
+  assert.deepEqual((await filter(tagA.object_id, null, "open", "outside")), []);
+  assert.equal((await filter(tagA.object_id))[0].classification.tags.length, 2);
+  assert.equal((await filter(tagA.object_id))[0].classification.category.color, "#AABBCC");
+  await rows("select public.assistant_complete_task($1)", [second.object_id]);
+  assert.deepEqual((await filter(tagA.object_id, null, "completed")).map(item => item.object_id), [second.object_id]);
+  assert.equal((await filter(tagA.object_id, null, "open")).some(item => item.object_id === second.object_id), false);
+  await rows("select public.assistant_replace_object_tags($1,$2::uuid[])", [first.object_id, [tagB.object_id]]);
+  assert.equal((await filter(tagA.object_id)).some(item => item.object_id === first.object_id), false);
+  assert.deepEqual((await filter(tagB.object_id)).map(item => item.object_id), [first.object_id]);
+  for (const role of ["anon", "authenticated", "service_role"]) {
+    const permitted = role === "service_role";
+    assert.equal((await one("select has_function_privilege($1,'public.assistant_list_tagged_tasks(uuid,uuid,text,text,integer,integer)','EXECUTE') allowed", [role])).allowed, permitted);
+    await db.exec(`set role ${role}`);
+    try {
+      if (permitted) assert.ok(Array.isArray(await filter(tagA.object_id)));
+      else await assert.rejects(() => filter(tagA.object_id), error => error.code === "42501");
+    } finally { await db.exec("reset role"); }
+  }
+  await assert.rejects(() => filter(tagA.object_id, null, "invalid"), error => error.code === "22023");
+  await assert.rejects(() => filter(tagA.object_id, null, "open", null, 101), error => error.code === "22023");
+  for (const item of [other, first, noCategory]) await rows("select public.assistant_cancel_task($1)", [item.object_id]);
+});
+
 test("Household Board Projection V0 composes Assistant state without durable board tables", async t => {
   await t.test("task surfacing, category composition, tags, and calendar windows", async () => {
     const cat = await one("select * from public.assistant_create_category('School','#5DD39E',0)");

@@ -55,4 +55,17 @@ export class SupabaseProjectionRepository {
     if (error) throw translate(error);
     return data ?? [];
   }
+
+  async listTaggedTasks(options) {
+    const { data, error } = await this.client.rpc("assistant_list_tagged_tasks", {
+      p_tag_object_id: options.tag_id,
+      p_category_object_id: options.category_id,
+      p_status: options.status,
+      p_query: options.query,
+      p_limit: options.limit,
+      p_offset: options.offset,
+    });
+    if (error) throw translate(error);
+    return data ?? [];
+  }
 }

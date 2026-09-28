@@ -85,6 +85,9 @@ Relationships:
     PK (target_object_id, tag_object_id)
 
 Adding an existing tag is idempotent. Removing a missing tag is harmless.
+Tags are reusable zero-or-many classifications. An ad-hoc task list (for example,
+Goodbye BBQ) is a Projection read of Tasks filtered by an assigned tag, not a
+separate persistence model or text added to a task description.
 Replacing an object's tag set is a complete replacement of the target's
 Classification-owned tag assignments. It validates that every supplied Tag ID
 is an existing active Tag before changing assignments, and applies the complete

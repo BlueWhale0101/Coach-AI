@@ -65,6 +65,7 @@ const ROUTES = {
   "/api/phone-today": "get-phone-today",
   "/api/object-decorations": "get-object-decorations",
   "/api/category-view": "get-category-view",
+  "/api/tagged-tasks": "get-tagged-tasks",
   "/api/complete-task": "complete-task",
   "/api/update-task": "update-task",
   "/api/cancel-task": "cancel-task",

@@ -52,6 +52,11 @@ The projection accepts an explicit display timezone. Today and Tomorrow are calc
 
 ## Mutation boundary
 
+The tagged-task read filters on Classification-owned object-tag assignments
+before applying status, category, text search, and pagination. It returns task
+rows with category, tags, and pin decoration in one bounded read for the phone
+Tasks list; Tasks does not store tag fields.
+
 Projection has no mutation endpoint. The tablet board completes Tasks through the Tasks capability and pins/unpins objects through Attention capabilities.
 
 ## Tablet hosting boundary
