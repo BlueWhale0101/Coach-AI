@@ -173,6 +173,9 @@ verify_jwt = false
 [functions.get-phone-today]
 verify_jwt = false
 
+[functions.get-client-today]
+verify_jwt = false
+
 [functions.get-object-decorations]
 verify_jwt = false
 

@@ -80,6 +80,26 @@ test("phone route and direct loads share the Site while tablet and root stay ava
   assert.equal((await request("/")).status, 308);
   assert.equal((await request("/api/phone-today")).status, 405);
   assert.equal((await worker.fetch(new Request("https://assistant.example/api/phone-today", { method: "POST" }), {})).status, 503);
+  assert.equal((await request("/api/client/today")).status, 401);
+  assert.equal((await worker.fetch(new Request("https://assistant.example/api/client/today", { method: "POST" }), {})).status, 405);
+  assert.equal((await worker.fetch(new Request("https://assistant.example/api/client/today?token=secret", { headers: { authorization: `Bearer ${"a".repeat(64)}` } }), {})).status, 400);
+  const originalFetch = globalThis.fetch;
+  let forwarded;
+  globalThis.fetch = async (url, options) => {
+    forwarded = { url, options };
+    return new Response('{"ok":true,"data":{"date":"2026-09-28"}}', { headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://assistant.example/api/client/today", { headers: { authorization: `Bearer ${"a".repeat(64)}` } }), {
+      ASSISTANT_SUPABASE_FUNCTIONS_URL: "https://functions.example/functions/v1",
+      ASSISTANT_ACTION_API_SECRET: "server-secret",
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal(forwarded.url, "https://functions.example/functions/v1/get-client-today");
+    assert.equal(forwarded.options.headers["x-action-secret"], "server-secret");
+    assert.equal(forwarded.options.headers.authorization, `Bearer ${"a".repeat(64)}`);
+  } finally { globalThis.fetch = originalFetch; }
   assert.equal((await request("/api/arbitrary-function")).status, 404);
   const script = await readFile(new URL("../phone/phone.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(script, /ASSISTANT_ACTION_API_SECRET|SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE/);

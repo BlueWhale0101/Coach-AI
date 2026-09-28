@@ -138,9 +138,32 @@ async function proxy(request, env, functionName) {
   });
 }
 
+async function clientToday(request, env) {
+  if (request.method !== "GET") return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405);
+  if (new URL(request.url).search) return json({ ok: false, code: "INVALID_REQUEST" }, 400);
+  const token = request.headers.get("authorization") ?? "";
+  if (!/^Bearer [0-9a-f]{64}$/i.test(token)) return json({ ok: false, code: "UNAUTHORIZED" }, 401);
+  const baseUrl = env.ASSISTANT_SUPABASE_FUNCTIONS_URL;
+  const secret = env.ASSISTANT_ACTION_API_SECRET;
+  if (!baseUrl || !secret) return json({ ok: false, code: "SERVER_CONFIG_ERROR" }, 503);
+  try {
+    const upstream = await fetch(\`\${baseUrl.replace(/\\/$/, "")}/get-client-today\`, {
+      method: "GET",
+      headers: { authorization: token, "x-action-secret": secret },
+    });
+    return new Response(await upstream.text(), {
+      status: upstream.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+    });
+  } catch {
+    return json({ ok: false, code: "SERVICE_UNAVAILABLE" }, 503);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/client/today") return clientToday(request, env);
     const functionName = ROUTES[url.pathname];
     if (functionName) return proxy(request, env, functionName);
     if (url.pathname === "/") {
