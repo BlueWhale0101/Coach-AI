@@ -20,14 +20,17 @@ export function compactWidgetToday(board) {
       url: "/phone/tasks",
     }));
   const seen = new Set();
-  const events = (board.days ?? []).flatMap(day => [
+  const candidates = (board.days ?? []).flatMap(day => [
     ...day.all_day_events.map(event => ({ event, date: day.date, all_day: true })),
     ...day.timed_events.map(event => ({ event, date: day.date, all_day: false })),
   ]).filter(({ event, date, all_day }) => date >= today && (all_day || Date.parse(event.ends_at) > now))
     .sort((a, b) => (a.date.localeCompare(b.date) ||
       (a.all_day ? 0 : Date.parse(a.event.starts_at)) - (b.all_day ? 0 : Date.parse(b.event.starts_at))))
-    .filter(({ event }) => { if (seen.has(event.object_id)) return false; seen.add(event.object_id); return true; })
-    .slice(0, 3).map(({ event, date, all_day }) => ({
+    .filter(({ event }) => { if (seen.has(event.object_id)) return false; seen.add(event.object_id); return true; });
+  const allDay = candidates.filter(item => item.all_day);
+  const timed = candidates.filter(item => !item.all_day);
+  const selected = allDay.length && timed.length ? [allDay[0], ...timed.slice(0, 2)] : candidates.slice(0, 3);
+  const events = selected.map(({ event, date, all_day }) => ({
       object_id: event.object_id, title: event.title, date, all_day,
       ...(all_day ? {} : { starts_at: event.starts_at, ends_at: event.ends_at }),
       category: event.category && { name: event.category.name, color: event.category.color },
