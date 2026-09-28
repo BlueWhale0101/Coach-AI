@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getFixtureBoardSnapshot, categories } from "../tablet-board/data-provider.mjs";
@@ -193,4 +194,14 @@ test("double-tap completes open Tasks and Board cards but never terminal Tasks",
     assert.equal(cancelledClick, Number(expected));
     assert.equal(event.defaultPrevented, expected);
   }
+});
+
+
+test("tablet board refreshes its current projection every five minutes without interrupting staged writes", async () => {
+  const source = await readFile(new URL("../tablet-board/board.mjs", import.meta.url), "utf8");
+  assert.match(source, /AUTO_REFRESH_MS = 5 \* 60 \* 1000/);
+  assert.match(source, /setInterval\(autoRefresh, AUTO_REFRESH_MS\)/);
+  assert.match(source, /if \(state\.pendingMutation\) return/);
+  assert.match(source, /loadTaskView\(\{ preserveControls: true \}\)/);
+  assert.match(source, /loadKnowledgeView\(\{ preserveControls: true \}\)/);
 });
