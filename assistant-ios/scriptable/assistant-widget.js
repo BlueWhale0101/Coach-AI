@@ -83,7 +83,8 @@ function selectRows(snapshot, mode) {
       (right.all_day ? 0 : Date.parse(right.starts_at)));
   if (mode === "tasks") return { tasks: snapshot.tasks.slice(0, 4), events: [] };
   if (mode === "calendar") return { tasks: [], events: events.slice(0, 3) };
-  return { tasks: snapshot.tasks.slice(0, 2), events: events.slice(0, 1) };
+  const next = events.find(event => !event.all_day) ?? events[0];
+  return { tasks: snapshot.tasks.slice(0, 2), events: next ? [next] : [] };
 }
 
 function modeFromParameter(parameter) {

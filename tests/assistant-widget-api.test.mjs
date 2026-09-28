@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createWidgetTodayHandler } from "../supabase/functions/_shared/widget-today-api.mjs";
+import { compactWidgetToday, createWidgetTodayHandler } from "../supabase/functions/_shared/widget-today-api.mjs";
 import { createTaskHandler } from "../supabase/functions/_shared/task-api.mjs";
 import { createProjectionHandler } from "../supabase/functions/_shared/projection-api.mjs";
 
@@ -21,6 +21,19 @@ const board = {
 };
 
 const endpoint = "https://project.supabase.co/functions/v1/get-client-today";
+
+test("widget projection reserves timed appointments alongside one or several all-day events", () => {
+  for (const count of [1, 4]) {
+    const all_day_events = Array.from({ length: count }, (_, index) => ({
+      object_id: `all-${index}`, title: `All day ${index}`, category: null,
+    }));
+    const later = { object_id: "later", title: "Later", starts_at: "2026-09-28T03:00:00Z", ends_at: "2026-09-28T04:00:00Z" };
+    const projected = compactWidgetToday({ ...board, days: [{ ...board.days[0], all_day_events,
+      timed_events: [...board.days[0].timed_events, later] }] });
+    assert.deepEqual(projected.events.map(event => event.object_id), ["all-0", "next", "later"]);
+    assert.equal(projected.events.some(event => event.object_id === "past"), false);
+  }
+});
 
 test("device bearer alone authorizes widget Today with a bounded Darwin-local presentation contract", async () => {
   let calls = 0;

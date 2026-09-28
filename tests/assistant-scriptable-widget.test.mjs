@@ -35,10 +35,22 @@ test("widget parses only the deployed Today contract and bounds its three views"
   assert.deepEqual(widget.selectRows(snapshot, "tasks").tasks.map(task => task.object_id), ["overdue", "today", "tomorrow", "no-due"]);
   assert.deepEqual(widget.selectRows(snapshot, "calendar").events.map(event => event.object_id), ["all", "current", "later"]);
   assert.deepEqual(widget.selectRows(snapshot, "today").tasks.map(task => task.object_id), ["overdue", "today"]);
-  assert.deepEqual(widget.selectRows(snapshot, "today").events.map(event => event.object_id), ["all"]);
+  assert.deepEqual(widget.selectRows(snapshot, "today").events.map(event => event.object_id), ["current"]);
   for (const invalid of [{ ok: false, data: response.data }, { ok: true, data: { ...response.data, timezone: "UTC" } }, { ok: true, data: { ...response.data, tasks: null } }]) {
     assert.throws(() => widget.parseSnapshot(invalid), /Unexpected widget response/);
   }
+});
+
+test("Today prefers a timed event while Calendar retains all-day and timed rows", () => {
+  const events = [
+    { object_id: "all-1", title: "Holiday", date: "2026-09-28", all_day: true },
+    { object_id: "all-2", title: "Closure", date: "2026-09-28", all_day: true },
+    { object_id: "next", title: "Visit", date: "2026-09-28", all_day: false, starts_at: "2026-09-28T01:00:00Z", ends_at: "2026-09-28T02:00:00Z" },
+  ];
+  const snapshot = widget.parseSnapshot({ ok: true, data: { ...response.data, events } });
+  assert.deepEqual(widget.selectRows(snapshot, "calendar").events.map(event => event.object_id), ["all-1", "all-2", "next"]);
+  assert.deepEqual(widget.selectRows(snapshot, "today").events.map(event => event.object_id), ["next"]);
+  assert.deepEqual(widget.selectRows({ ...snapshot, events: events.slice(0, 2) }, "today").events.map(event => event.object_id), ["all-1"]);
 });
 
 test("deadline and event labels use Darwin boundaries without manufacturing a due date", () => {

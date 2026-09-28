@@ -6,7 +6,7 @@ One read-only Scriptable script supplies three **medium iPhone Home Screen** wid
 | --- | --- | --- |
 | `tasks` | Up to four attention tasks, with real deadlines when present | `/phone/tasks` |
 | `calendar` | Up to three current/upcoming events | `/phone/calendar` |
-| `today` | Two tasks and the next event | `/phone/` |
+| `today` | Two tasks and the next timed event (or an all-day event when no timed event is available) | `/phone/` |
 
 All tap destinations use `https://assistant-tablet-board-v0.iona-skye-eller.chatgpt.site`. Scriptable fetches data directly from the dedicated `get-client-today` Supabase Edge Function using a device-specific token. The Site remains private; the Site login is needed when opening the Phone page, not when fetching widget data.
 
