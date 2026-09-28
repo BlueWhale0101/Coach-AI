@@ -12,6 +12,7 @@ const root = document.querySelector("#phone-root");
 const nav = document.querySelector("#phone-nav");
 const strip = document.querySelector("#phone-undo");
 const staging = new StagedMutationController();
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 const state = {
   route: phoneRoute(location.pathname), day: todayKey(), items: [], snapshot: null,
   categories: [], tags: [], tag: "", query: { tasks: "", knowledge: "" }, status: "open",
@@ -285,30 +286,34 @@ const load = createPhoneLoader({
   empty,
   shiftDay,
 });
+function syncFilterSelect(label, items, allLabel) {
+  const select = document.querySelector(`select[aria-label="${label}"]`);
+  if (!select) return;
+  const selected = select.value;
+  select.replaceChildren();
+  const all = node("option", "", allLabel);
+  all.value = "";
+  select.appendChild(all);
+  for (const item of items) {
+    const option = node("option", "", item.name);
+    option.value = item.object_id;
+    select.appendChild(option);
+  }
+  select.value = items.some(item => item.object_id === selected) ? selected : "";
+}
+async function refreshReferenceData() {
+  const [categories, tags] = await Promise.all([listCategories(), listTags()]);
+  state.categories = categories;
+  state.tags = tags;
+  syncFilterSelect("Category", categories, "All categories");
+  syncFilterSelect("Tag", tags, "All tags");
+}
+async function autoRefresh() {
+  if (state.pending) return;
+  await Promise.allSettled([load(), refreshReferenceData()]);
+}
 window.addEventListener("popstate", () => navigate(phoneRoute(location.pathname), false));
 showRoute();
 load();
-listCategories().then(categories => {
-  state.categories = categories;
-  const select = document.querySelector('select[aria-label="Category"]');
-  if (!select) return;
-  const selected = select.value;
-  for (const item of categories) {
-    const option = node("option", "", item.name);
-    option.value = item.object_id;
-    select.appendChild(option);
-  }
-  select.value = selected;
-}).catch(() => {});
-listTags().then(tags => {
-  state.tags = tags;
-  const select = document.querySelector('select[aria-label="Tag"]');
-  if (!select) return;
-  const selected = select.value;
-  for (const item of tags) {
-    const option = node("option", "", item.name);
-    option.value = item.object_id;
-    select.appendChild(option);
-  }
-  select.value = selected;
-}).catch(() => {});
+refreshReferenceData().catch(() => {});
+setInterval(autoRefresh, AUTO_REFRESH_MS);
