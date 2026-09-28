@@ -21,6 +21,7 @@ import { VISIBLE_HOUR_OPTIONS, loadDisplaySettings, normalizeDisplaySettings, re
 import { addDays, bindTaskDoubleTap, computePaneHourPixels, eventDateKey, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, taskActionsForStatus, weekDays, weekRange } from "./view-helpers.mjs";
 
 const STAGE_DELAY_MS = 5000;
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 const root = document.querySelector("#board-root");
 const undoStrip = document.querySelector("#undo-strip");
 const staging = new StagedMutationController({ delayMs: STAGE_DELAY_MS });
@@ -1129,4 +1130,13 @@ window.addEventListener("focus", () => {
   if (!state.pendingMutation) loadCurrentView();
 });
 
+async function autoRefresh() {
+  if (state.pendingMutation) return;
+  if (state.route === "board") return loadBoard();
+  if (state.route === "tasks") return loadTaskView({ preserveControls: true });
+  if (state.route === "calendar") return loadCalendarView();
+  return loadKnowledgeView({ preserveControls: true });
+}
+
 loadCurrentView();
+setInterval(autoRefresh, AUTO_REFRESH_MS);
