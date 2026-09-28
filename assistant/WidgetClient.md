@@ -4,9 +4,9 @@ This is a read-only projection of the existing Phone Today result for a trusted 
 
 ## Request
 
-`GET /api/client/today` on the Assistant.AI Site, with `Authorization: Bearer <device token>`. No query parameters or request body. The device token is 32 random bytes encoded as 64 hexadecimal characters. Send it only in the header over HTTPS; do not put it in a URL or in the phone page's browser code.
+`GET https://<supabase-project>.supabase.co/functions/v1/get-client-today`, with `Authorization: Bearer <device token>`. No query parameters or request body. The Supabase project/function URL is public configuration, not a secret. The device token is 32 random bytes encoded as 64 hexadecimal characters. Send it only in the header over HTTPS; do not put it in a URL or in the phone page's browser code.
 
-The Site forwards this one request to `get-client-today` with the server-side `ACTION_API_SECRET`. The Edge Function validates that secret, hashes the device token with SHA-256, looks up the digest using its service role, checks the exact `widget:today:read` scope and optional expiration/revocation, and calls `assistant_get_phone_today`. It returns `Cache-Control: no-store`. The device credential cannot invoke any other Site API or Edge Function. No Supabase URL, service-role key, or action secret is returned to the client.
+The dedicated Edge Function hashes the device token with SHA-256, looks up the digest using its server-side service role, checks the exact `widget:today:read` scope and optional expiration/revocation, and calls `assistant_get_phone_today`. It returns `Cache-Control: no-store`. The device token is the only client credential and cannot authorize any other Assistant capability. No service-role key, action secret, or other server credential is sent to or returned to the client. This function is configured with `verify_jwt = false` so Supabase can pass the device bearer token to its own validator.
 
 ## Response
 
@@ -16,6 +16,6 @@ Errors return `{ "ok": false, "code": "..." }` with 400 for unsupported query pa
 
 ## Provisioning and revocation
 
-No token is provisioned by the migration. After review and deployment, create a random 32-byte token on a trusted machine, record its **SHA-256 digest of the 64-character token text** in `assistant_widget_client_credentials` with a label and scope `widget:today:read`, then transfer the raw token to the intended device through a secure channel. Insert using a privileged database administrator connection; the service role has SELECT only. Use a distinct token for each device. Revoke one device by setting its `revoked_at` timestamp; neither the server secret nor other device credentials need rotation. Never check tokens or token digests into Git.
+No token is provisioned by the migration. After review and deployment, create a random 32-byte token on a trusted machine, record its **SHA-256 digest of the 64-character token text** in `assistant_widget_client_credentials` with a label and scope `widget:today:read`, then transfer the raw token to the intended device through a secure channel. Insert using a privileged database administrator connection; the service role has SELECT only. Use a distinct token for each device. Revoke one device by setting its `revoked_at` timestamp; other device credentials and server credentials need no rotation. Never check tokens or token digests into Git.
 
-The existing Site is owner-private. Its hosting sign-in gate may reject a Scriptable HTTP request before this route runs. Verify access from Scriptable after deployment; if the gate blocks the request, an explicitly approved route-level access solution is needed before the widget can use this API. Do not change the entire Site's audience merely to work around that gate. The Site and Edge Function are intentionally not deployed by this PR.
+The Assistant.AI Site remains owner-private. Scriptable requests the dedicated Edge Function directly, so its access does not depend on Site sign-in. The Edge Function and migration are intentionally not deployed by this PR. No Scriptable UI is included.

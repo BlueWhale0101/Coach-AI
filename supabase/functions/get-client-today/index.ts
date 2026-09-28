@@ -5,7 +5,6 @@ import { SupabaseProjectionRepository } from "../_shared/supabase-projection-rep
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const key = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-const actionSecret = Deno.env.get("ACTION_API_SECRET") ?? "";
 const configured = Boolean(url && key);
 const client = configured ? createClient(url, key, { auth: { persistSession: false } }) : null;
 
@@ -19,6 +18,5 @@ serve(createWidgetTodayHandler({
       return data;
     },
   },
-  actionSecret,
   configured,
 }));

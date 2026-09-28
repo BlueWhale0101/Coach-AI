@@ -37,11 +37,10 @@ export function compactWidgetToday(board) {
     tasks, events, url: "/phone/" };
 }
 
-export function createWidgetTodayHandler({ repository, credentials, actionSecret, configured = true, clock = () => new Date() }) {
+export function createWidgetTodayHandler({ repository, credentials, configured = true, clock = () => new Date() }) {
   return async request => {
     if (request.method !== "GET") return error("METHOD_NOT_ALLOWED", 405);
-    if (!configured || !actionSecret) return error("SERVER_CONFIG_ERROR", 503);
-    if (request.headers.get("x-action-secret") !== actionSecret) return error("UNAUTHORIZED", 401);
+    if (!configured) return error("SERVER_CONFIG_ERROR", 503);
     const url = new URL(request.url);
     if (url.search) return error("INVALID_REQUEST", 400);
     const match = /^Bearer ([0-9a-f]{64})$/i.exec(request.headers.get("authorization") ?? "");
