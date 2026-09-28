@@ -5,7 +5,13 @@ const root = resolve(new URL("..", import.meta.url).pathname);
 const dist = resolve(root, "dist");
 const server = resolve(dist, "server");
 
+const binaryAsset = async (path, type) => ({ type, body: (await readFile(resolve(root, path))).toString("base64"), encoding: "base64" });
+
 const assets = {
+  "/manifest.webmanifest": { type: "application/manifest+json; charset=utf-8", body: await readFile(resolve(root, "manifest.webmanifest"), "utf8") },
+  "/icons/icon-32.png": await binaryAsset("icons/icon-32.png", "image/png"),
+  "/icons/icon-192.png": await binaryAsset("icons/icon-192.png", "image/png"),
+  "/icons/icon-512.png": await binaryAsset("icons/icon-512.png", "image/png"),
   "/tablet-board/": {
     type: "text/html; charset=utf-8",
     body: await readFile(resolve(root, "tablet-board/index.html"), "utf8"),
@@ -96,7 +102,10 @@ function asset(pathname) {
   const key = pathname === "/" ? "/tablet-board/" : pathname;
   const item = ASSETS[key];
   if (!item) return null;
-  return new Response(item.body, {
+  const body = item.encoding === "base64"
+    ? Uint8Array.from(atob(item.body), character => character.charCodeAt(0))
+    : item.body;
+  return new Response(body, {
     headers: {
       "content-type": item.type,
       "cache-control": "no-store",
