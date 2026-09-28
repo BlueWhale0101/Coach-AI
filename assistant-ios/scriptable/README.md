@@ -22,3 +22,7 @@ All tap destinations use `https://assistant-tablet-board-v0.iona-skye-eller.chat
 The script uses only Scriptable's native widget layout. iOS decides when to refresh; the script makes one GET per refresh and does not schedule polling. It caches the last successful, bounded response **locally on the device**. A temporary network or service failure uses that response and labels the time `Saved HH:MM`; invalid/revoked credentials do not fall back to cached household data. Run the script interactively for a diagnostic alert or to replace a rejected token. If the API URL changes, remove Scriptable's local `assistant-ai-widget-config.json` and rerun setup; the Keychain token stays separate. Remove the local `assistant-ai-widget-last-success.json` if you want to clear the cached titles/events.
 
 V1 intentionally targets the medium Home Screen layout and has no task/event actions. The API contract and credential handling are documented in [`assistant/WidgetClient.md`](../../assistant/WidgetClient.md).
+
+## Widget tap behavior on iOS
+
+The widget opens the matching Assistant.AI HTTPS route. iOS Home Screen web apps do not expose a custom URL scheme or associated-domain registration that an external Scriptable widget can target, so there is no supported direct handoff from Scriptable into the installed Assistant.AI PWA. Keep the HTTPS destination rather than adding a Shortcut or other launcher indirection; iOS may open it in the browser. The installed PWA itself remains the preferred direct launcher from the Home Screen.
