@@ -85,6 +85,10 @@ test("phone route and direct loads share the Site while tablet and root stay ava
   assert.equal((await request("/api/arbitrary-function")).status, 404);
   const script = await readFile(new URL("../phone/phone.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(script, /ASSISTANT_ACTION_API_SECRET|SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE/);
+  assert.match(script, /AUTO_REFRESH_MS = 5 \* 60 \* 1000/);
+  assert.match(script, /setInterval\(autoRefresh, AUTO_REFRESH_MS\)/);
+  assert.match(script, /Promise\.allSettled\(\[load\(\), refreshReferenceData\(\)\]\)/);
+  assert.match(script, /if \(state\.pending\) return/);
 });
 
 test("Today composition respects task semantics and includes the next few calendar entries", () => {
