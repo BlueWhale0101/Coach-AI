@@ -106,15 +106,17 @@ function createText(container, text, size, color, weight = "regular") {
   return label;
 }
 
-function row(container, item, label, overdue = false) {
+function row(container, item, label, overdue = false, options = {}) {
   const line = container.addStack();
   line.layoutHorizontally();
   line.centerAlignContent();
   line.spacing = 7;
   createText(line, "●", 8, categoryColor(item));
-  createText(line, item.title, 14, PALETTE.text);
+  const title = createText(line, item.title, options.titleSize ?? 14, PALETTE.text);
+  title.lineLimit = options.titleLines ?? 1;
+  title.minimumScaleFactor = options.minimumScaleFactor ?? 0.8;
   line.addSpacer(4);
-  if (label) createText(line, label, 11, overdue ? PALETTE.overdue : PALETTE.secondary);
+  if (label) createText(line, label, options.labelSize ?? 11, overdue ? PALETTE.overdue : PALETTE.secondary);
 }
 
 function section(widget, title) {
@@ -161,9 +163,11 @@ function renderWidget(snapshot, mode, { cached = false, now = new Date() } = {})
     if (mode === "today") section(widget, "Tasks");
     if (!selected.tasks.length) createText(widget, "Nothing needing attention", 14, PALETTE.secondary);
     selected.tasks.forEach((task, index) => {
-      if (index) widget.addSpacer(7);
+      if (index) widget.addSpacer(mode === "tasks" ? 12 : 7);
       const label = taskDue(task, snapshot.date, now);
-      row(widget, task, label, label.startsWith("OVERDUE"));
+      row(widget, task, label, label.startsWith("OVERDUE"), mode === "tasks"
+        ? { titleSize: 17, labelSize: 13, titleLines: 2, minimumScaleFactor: 0.9 }
+        : {});
     });
   }
   if (mode === "today") widget.addSpacer(10);
