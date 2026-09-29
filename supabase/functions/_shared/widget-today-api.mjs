@@ -3,17 +3,14 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
   headers: { "content-type": "application/json", "cache-control": "no-store" },
 });
 const error = (code, status) => json({ ok: false, code }, status);
-const dateInDarwin = instant => new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Australia/Darwin", year: "numeric", month: "2-digit", day: "2-digit",
-}).format(new Date(instant));
 
 export function compactWidgetToday(board) {
   const metadata = board.metadata;
   const today = metadata.today;
   const now = Date.parse(metadata.now);
-  const tasks = board.tasks.filter(task => task.pinned || task.surface_reason === "overdue" ||
-    (task.due_at && dateInDarwin(task.due_at) === today) || task.surface_reason === "actionable")
-    .slice(0, 6).map(task => ({
+  // The household projection owns task surfacing and ordering. Keep that order here
+  // instead of re-filtering it in the widget adapter.
+  const tasks = board.tasks.slice(0, 6).map(task => ({
       object_id: task.object_id, title: task.title, due_at: task.due_at,
       surface_reason: task.surface_reason, pinned: task.pinned,
       category: task.category && { name: task.category.name, color: task.category.color },

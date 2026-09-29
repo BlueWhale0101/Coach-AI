@@ -52,7 +52,8 @@ test("device bearer alone authorizes widget Today with a bounded Darwin-local pr
   const { data } = JSON.parse(payload);
   assert.equal(data.date, "2026-09-28");
   assert.equal(data.generated_at, now);
-  assert.deepEqual(data.tasks.map(item => item.object_id), ["task-1", "task-2"]);
+  // The widget adapter preserves the household projection's ranked task list, including due-soon tasks.
+  assert.deepEqual(data.tasks.map(item => item.object_id), ["task-1", "task-2", "task-3"]);
   assert.equal(data.tasks[0].category.color, "#7C9CFF");
   assert.equal(data.tasks[0].description, undefined);
   assert.deepEqual(data.events.map(item => item.object_id), ["all-1", "next"]);
