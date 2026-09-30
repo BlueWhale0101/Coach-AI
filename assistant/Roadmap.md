@@ -88,3 +88,35 @@ Revisit widget/projection ranking based on observed use. A candidate ordering is
 Future `not_before` tasks should remain hidden until they become actionable.
 
 Do not implement the candidate policy solely from this note; validate it against additional real usage during the stabilization period.
+
+**Update**
+
+The widget adapter's redundant filtering was removed so it now preserves the Projection layer's task ordering. Meaningful `not_before` values remain the mechanism for keeping future work out of the actionable pool. Continue evaluating the resulting behavior during stabilization.
+
+### 2026-09-30 — Tablet calendar should follow the useful part of the day
+
+**Observed behavior**
+
+The tablet board refreshes its data periodically, but the calendar viewport does not reposition as the day advances. By afternoon, the ambient board can remain centered on an earlier part of the day rather than the hours that are now useful.
+
+**Desired behavior**
+
+During the existing periodic refresh, update the calendar's scroll/visible position as well as its data. A simple first policy is sufficient: after noon, shift the calendar down so the afternoon and evening are visible.
+
+This is an ambient-display behavior, not a scheduling/data-model change. Avoid adding a separate timer or orchestration mechanism if the existing five-minute refresh can own it cleanly.
+
+### 2026-09-30 — Phone Site latency discourages use
+
+**Observed behavior**
+
+The Scriptable widget and Assistant.AI chat are proving highly useful, but the phone Site feels slow enough that the user is avoiding it.
+
+**Impact**
+
+Treat this as a stabilization usability issue, not merely optional optimization. The phone interface's role is quick browsing and lightweight task management; if opening or navigating it feels materially slower than the widget/chat path, it is failing that role even when functionally correct.
+
+**Investigation target**
+
+Measure before redesigning. Profile the phone path end to end, including initial document/PWA load, projection request latency, category/tag reference-data requests, route changes, rendering, and the five-minute refresh path. Identify whether the dominant delay is network/Edge Function cold start, sequential requests, projection/database work, unnecessary reloads, or client rendering.
+
+Prefer changes that make the existing architecture faster. Do not introduce local shadow state, a second task store, or a new orchestration layer merely to mask latency.
