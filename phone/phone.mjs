@@ -15,6 +15,7 @@ const nav = document.querySelector("#phone-nav");
 const strip = document.querySelector("#phone-undo");
 const staging = new StagedMutationController();
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
+const TODAY_TASK_LIMIT = 6;
 const state = {
   route: phoneRoute(location.pathname), day: todayKey(), items: [], snapshot: null,
   categories: [], tags: [], tag: "", query: { tasks: "", knowledge: "" }, status: "open",
@@ -101,7 +102,8 @@ async function edit(item, type) {
 function heading(title, caption) {
   const header = node("header", "page-header");
   header.append(node("p", "eyebrow", caption), node("h1", "", title));
-  if (state.syncStatus) header.appendChild(node("p", "sync-status", state.syncStatus));
+  // Keep this slot in the layout so a sync update never nudges the view down.
+  header.appendChild(node("p", "sync-status", state.syncStatus));
   return header;
 }
 function section(title, count) {
@@ -175,7 +177,9 @@ function renderResults() {
   if (state.route === "today") {
     const snapshot = state.snapshot;
     if (!snapshot) return;
-    const tasks = attentionTasks(snapshot).filter(item => item.status !== "completed" && item.status !== "cancelled");
+    const tasks = attentionTasks(snapshot)
+      .filter(item => item.status !== "completed" && item.status !== "cancelled")
+      .slice(0, TODAY_TASK_LIMIT);
     const taskSection = section("Needs attention", tasks.length);
     taskSection.append(...(tasks.length ? tasks.map(item => detailCard(item, "task")) : [empty("Nothing pressing right now.")]));
     results.appendChild(taskSection);
@@ -294,10 +298,8 @@ function setSyncStatus(value) {
   if (state.syncStatus === value) return;
   state.syncStatus = value;
   const existing = document.querySelector(".sync-status");
-  if (existing) {
-    if (value) existing.textContent = value;
-    else existing.remove();
-  } else if (value) document.querySelector(".page-header")?.appendChild(node("p", "sync-status", value));
+  if (existing) existing.textContent = value;
+  else document.querySelector(".page-header")?.appendChild(node("p", "sync-status", value));
 }
 function adoptProjection(projection) {
   state.cache = projection;
