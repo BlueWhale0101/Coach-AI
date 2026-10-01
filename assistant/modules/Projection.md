@@ -50,6 +50,12 @@ The projection accepts an explicit display timezone. Today and Tomorrow are calc
 
 `assistant_get_phone_today` reuses the household board's bounded task selection and composes four Darwin-local days through the existing day helper. The phone selects attention-worthy tasks and displays today's schedule plus a few upcoming entries. This read creates no task deadlines or durable phone state. The RPC is `SECURITY INVOKER`, executable by `service_role` only, and reached from the browser through the Site's specific `/api/phone-today` allowlist entry.
 
+## Phone local projection cache
+
+The phone PWA may retain one versioned IndexedDB record as a client-side cache of a bounded read projection: the Phone Today snapshot, up to 80 open decorated task rows, active category/tag reference rows, and Darwin-local calendar events from the previous day through the following seven days. It is not a durable module, replica, or write authority.
+
+At startup the phone renders a valid cached record first and refreshes that same bounded projection in the background using existing read capabilities. A successful refresh atomically replaces the record, so completed, deleted, and changed server objects naturally disappear or update. Failure leaves the prior record available and is indicated unobtrusively. Schema-version mismatch or corruption discards the record and rebuilds it from the server. Historical tasks, Knowledge, and calendar navigation outside the cached window retain their existing on-demand reads. Phone writes remain online calls to their owning modules; queued offline mutations are deliberately outside this scope.
+
 ## Mutation boundary
 
 The tagged-task read filters on Classification-owned object-tag assignments
