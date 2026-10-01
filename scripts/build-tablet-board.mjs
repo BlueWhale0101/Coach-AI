@@ -55,6 +55,9 @@ const assets = {
   "/phone/dom.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/dom.mjs"), "utf8") },
   "/phone/load-view.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/load-view.mjs"), "utf8") },
   "/phone/view-model.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/view-model.mjs"), "utf8") },
+  "/phone/cache.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/cache.mjs"), "utf8") },
+  "/phone/local-projection.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/local-projection.mjs"), "utf8") },
+  "/phone/sw.js": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/sw.js"), "utf8") },
   "/assistant-ui/tokens.css": { type: "text/css; charset=utf-8", body: await readFile(resolve(root, "assistant-ui/tokens.css"), "utf8") },
 };
 
