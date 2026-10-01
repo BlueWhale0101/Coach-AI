@@ -5,6 +5,8 @@ import { execFileSync } from "node:child_process";
 import { node } from "../phone/dom.mjs";
 import { createPhoneLoader } from "../phone/load-view.mjs";
 import { agendaForDay, attentionTasks, phonePath, phoneRoute, shiftDay, taskActions, todayKey, upcomingEvents } from "../phone/view-model.mjs";
+import { PHONE_CACHE_SCHEMA, validPhoneProjection } from "../phone/cache.mjs";
+import { cachedEvents, cachedTasks, projectionWindow, refreshPhoneProjection } from "../phone/local-projection.mjs";
 import { getPhoneTodaySnapshot, listTaskView, listWeekEvents } from "../tablet-board/data-provider.mjs";
 import { StagedMutationController } from "../tablet-board/mutation-staging.mjs";
 
@@ -87,8 +89,63 @@ test("phone route and direct loads share the Site while tablet and root stay ava
   assert.doesNotMatch(script, /ASSISTANT_ACTION_API_SECRET|SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE/);
   assert.match(script, /AUTO_REFRESH_MS = 5 \* 60 \* 1000/);
   assert.match(script, /setInterval\(autoRefresh, AUTO_REFRESH_MS\)/);
-  assert.match(script, /Promise\.allSettled\(\[load\(\), refreshReferenceData\(\)\]\)/);
+  assert.match(script, /createPhoneProjectionStore/);
+  assert.match(script, /refreshPhoneProjection/);
+  assert.match(script, /navigator\.serviceWorker\.register/);
   assert.match(script, /if \(state\.pending\) return/);
+});
+
+test("phone projection cache supplies decorated open tasks and local Darwin calendar without a network read", () => {
+  const projection = {
+    schema: PHONE_CACHE_SCHEMA, timezone: "Australia/Darwin", cachedAt: "2026-09-27T01:00:00Z",
+    windowStart: "2026-09-26", windowEnd: "2026-10-05", today: { days: [] }, categories: [], tags: [],
+    openTasks: [
+      { object_id: "keep", title: "School form", description: "Bring it", status: "open", category: { id: "school" },
+        tags: ["paperwork"], tagObjects: [{ object_id: "paperwork", name: "paperwork" }], pinned: true },
+      { object_id: "other", title: "Shop", description: "Milk", status: "open", category: { id: "errands" }, tags: [], tagObjects: [] },
+    ],
+    events: [
+      { object_id: "midnight", time_kind: "timed", date: "2026-09-27", starts_at: "2026-09-26T14:45:00Z" },
+      { object_id: "span", time_kind: "all_day", start_date: "2026-09-26", end_date: "2026-09-28" },
+    ],
+  };
+  assert.equal(validPhoneProjection(projection), true);
+  assert.deepEqual(cachedTasks(projection, { tagId: "paperwork" }).map(task => task.object_id), ["keep"]);
+  assert.deepEqual(cachedTasks(projection, { query: "milk" }).map(task => task.object_id), ["other"]);
+  assert.equal(cachedTasks(projection, { status: "completed" }), null, "historical tasks remain network-only");
+  assert.deepEqual(cachedEvents(projection, "2026-09-27").map(event => event.object_id), ["midnight", "span"]);
+  assert.equal(cachedEvents(projection, "2026-10-05"), null);
+  assert.deepEqual(projectionWindow("2026-09-27"), { start: "2026-09-26", end: "2026-10-05" });
+});
+
+test("background phone projection refresh atomically replaces stale rows and retains only the bounded decorated working set", async () => {
+  const writes = [];
+  const services = {
+    getPhoneTodaySnapshot: async () => ({ metadata: { today: "2026-09-27" }, days: [], tasks: [] }),
+    listTaskView: async options => { assert.deepEqual(options, { status: "open", limit: 80 }); return [{ object_id: "fresh", tags: ["travel"], tagObjects: [{ object_id: "tag", name: "travel" }], pinned: true }]; },
+    listCategories: async () => [{ object_id: "cat", name: "Home" }],
+    listTags: async () => [{ object_id: "tag", name: "travel" }],
+    listWeekEvents: async options => { assert.equal(options.weekStart, "2026-09-26"); assert.equal(options.weekEnd, "2026-10-05"); return [{ object_id: "event", time_kind: "timed", date: "2026-09-27" }]; },
+  };
+  const result = await refreshPhoneProjection({ services, store: { write: async projection => { writes.push(projection); } }, day: "2026-09-27", now: "2026-09-27T02:00:00Z" });
+  assert.equal(writes.length, 1);
+  assert.deepEqual(result.openTasks.map(task => task.object_id), ["fresh"], "completed/deleted old rows are removed by replacement");
+  assert.equal(result.openTasks[0].tagObjects[0].object_id, "tag");
+  assert.equal(result.schema, PHONE_CACHE_SCHEMA);
+});
+
+test("obsolete or corrupt cache records fail validation and a refresh failure leaves an existing cache untouched", async () => {
+  assert.equal(validPhoneProjection({ schema: PHONE_CACHE_SCHEMA - 1 }), false);
+  assert.equal(validPhoneProjection({ schema: PHONE_CACHE_SCHEMA, timezone: "UTC", cachedAt: "x", today: {}, openTasks: [], events: [], categories: [], tags: [], windowStart: "2026-01-01", windowEnd: "2026-01-02" }), false);
+  let writes = 0;
+  await assert.rejects(refreshPhoneProjection({
+    services: {
+      getPhoneTodaySnapshot: async () => { throw new Error("offline"); },
+      listTaskView: async () => [], listCategories: async () => [], listTags: async () => [], listWeekEvents: async () => [],
+    },
+    store: { write: async () => { writes++; } }, day: "2026-09-27",
+  }));
+  assert.equal(writes, 0);
 });
 
 test("Today composition respects task semantics and includes the next few calendar entries", () => {
