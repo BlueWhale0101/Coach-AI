@@ -27,6 +27,7 @@ Review:
 - Projection and API call patterns.
 - Supabase queries and indexes.
 - Site load and five-minute refresh behavior.
+- Phone startup performance as a separate concern from data-fetch latency: tap -> first paint -> cached content -> synchronized.
 - MCP latency and agent-facing tool ergonomics.
 - Reconciliation cost, reliability, and idempotence.
 - Security configuration and Supabase advisor findings.
@@ -88,3 +89,56 @@ Revisit widget/projection ranking based on observed use. A candidate ordering is
 Future `not_before` tasks should remain hidden until they become actionable.
 
 Do not implement the candidate policy solely from this note; validate it against additional real usage during the stabilization period.
+
+
+### 2026-10-01 — Make cold phone startup feel immediate
+
+**Observed behavior**
+
+The new offline-first/local cache has materially improved the phone experience. Once the PWA is running, locally cached task/calendar data removes most of the network-driven lag and the app feels much faster.
+
+A remaining delay is visible when the PWA has been evicted or suspended by iOS. Roughly two seconds of startup latency in that case is a different problem from data latency: the application itself has to boot before cached state can be useful.
+
+**Startup model**
+
+Treat startup as a separate measured pipeline:
+
+`tap -> iOS/WebKit launch -> application shell load -> JavaScript execution -> local state open -> first useful paint -> synchronization`
+
+Measure at least these intervals independently:
+
+1. tap -> first paint;
+2. first paint -> cached useful content;
+3. cached content -> synchronized state.
+
+The local-first work has made the third interval largely irrelevant to perceived usability. The next optimization target is the first two.
+
+**Performance target**
+
+First useful pixels should require:
+
+- no network;
+- no backend response;
+- no synchronization;
+- as little JavaScript and initialization work as practical.
+
+When last-known-good data exists, prefer showing stale data immediately over a skeleton. Refresh it quietly afterward.
+
+**Candidate optimizations**
+
+- Render a useful Assistant shell directly in the initial document so first paint does not depend on JavaScript initialization.
+- Persist a tiny precomputed snapshot of the last rendered phone view and paint it immediately, then hydrate from the authoritative local cache.
+- Keep startup JavaScript small. Lazy-load functionality that is not needed for the first screen, such as search, knowledge browsing, editing UI, and distant-calendar functionality.
+- Avoid scanning, filtering, decorating, cleaning, or synchronizing the full local store before first useful paint. Display the already-prepared phone projection first; defer maintenance work.
+- Aggressively service-worker-cache the application shell and all assets required for first paint so a cold-ish launch requires zero network.
+- Avoid blocking fonts and heavyweight asset dependencies; favor system fonts and small local assets.
+- Split phone startup code from unrelated tablet or secondary-view machinery if bundle analysis shows that code is on the critical path.
+- Move necessary but non-render-critical work until after first paint using an appropriate deferred/idle mechanism.
+
+**Constraint**
+
+There is an eventual floor imposed by iOS launching the PWA/WebKit process after eviction. Do not treat platform launch time as an application-data problem or introduce architectural complexity merely to hide it.
+
+**Priority**
+
+This is a high-value optimization because the phone UI is intended for quick interaction. A reduction from a noticeable cold-start pause toward an immediate-feeling last-known-good view is likely to improve actual use more than adding several new Assistant features.
