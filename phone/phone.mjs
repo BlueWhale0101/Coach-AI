@@ -7,6 +7,8 @@ import { StagedMutationController } from "../tablet-board/mutation-staging.mjs";
 import { node } from "./dom.mjs";
 import { createPhoneLoader } from "./load-view.mjs";
 import { agendaForDay, attentionTasks, DESTINATIONS, phonePath, phoneRoute, shiftDay, taskActions, todayKey, upcomingEvents } from "./view-model.mjs";
+import { createPhoneProjectionStore } from "./cache.mjs";
+import { cachedEvents, cachedTasks, refreshPhoneProjection } from "./local-projection.mjs";
 
 const root = document.querySelector("#phone-root");
 const nav = document.querySelector("#phone-nav");
@@ -17,8 +19,9 @@ const state = {
   route: phoneRoute(location.pathname), day: todayKey(), items: [], snapshot: null,
   categories: [], tags: [], tag: "", query: { tasks: "", knowledge: "" }, status: "open",
   category: { tasks: "", knowledge: "" }, expanded: null, pending: null,
-  request: 0, searchTimer: null,
+  request: 0, searchTimer: null, cache: null, syncing: false, syncStatus: "",
 };
+const projectionStore = createPhoneProjectionStore();
 
 function button(label, action, className = "") {
   const element = node("button", className, label);
@@ -46,7 +49,7 @@ function stage({ item, text, mutate, commit }) {
     commit,
     onUndo: () => { Object.assign(item, before); if (state.route === "today") load(); else renderResults(); },
     onCommit: () => {
-      if (state.pending === mutation) { state.pending = null; strip.hidden = true; load(); }
+      if (state.pending === mutation) { state.pending = null; strip.hidden = true; refreshProjection({ force: true }); }
     },
     onFailure: () => {
       if (state.pending === mutation) state.pending = null;
@@ -98,6 +101,7 @@ async function edit(item, type) {
 function heading(title, caption) {
   const header = node("header", "page-header");
   header.append(node("p", "eyebrow", caption), node("h1", "", title));
+  if (state.syncStatus) header.appendChild(node("p", "sync-status", state.syncStatus));
   return header;
 }
 function section(title, count) {
@@ -278,7 +282,7 @@ function navigate(route, push = true) {
   showRoute();
   load();
 }
-const load = createPhoneLoader({
+const networkLoad = createPhoneLoader({
   state,
   services: { getPhoneTodaySnapshot, listTaskView, listKnowledgeView, listWeekEvents },
   getResults: () => document.querySelector("#phone-results"),
@@ -286,6 +290,57 @@ const load = createPhoneLoader({
   empty,
   shiftDay,
 });
+function setSyncStatus(value) {
+  if (state.syncStatus === value) return;
+  state.syncStatus = value;
+  const existing = document.querySelector(".sync-status");
+  if (existing) {
+    if (value) existing.textContent = value;
+    else existing.remove();
+  } else if (value) document.querySelector(".page-header")?.appendChild(node("p", "sync-status", value));
+}
+function adoptProjection(projection) {
+  state.cache = projection;
+  state.categories = projection.categories;
+  state.tags = projection.tags;
+}
+function renderCachedRoute() {
+  const projection = state.cache;
+  if (!projection) return false;
+  if (state.route === "today") state.snapshot = projection.today;
+  else if (state.route === "tasks") {
+    const tasks = cachedTasks(projection, { query: state.query.tasks, status: state.status, categoryId: state.category.tasks, tagId: state.tag });
+    if (tasks === null) return false;
+    state.items = tasks;
+  } else if (state.route === "calendar") {
+    const events = cachedEvents(projection, state.day);
+    if (events === null) return false;
+    state.items = events;
+  } else return false; // Knowledge remains intentionally on-demand.
+  renderResults();
+  return true;
+}
+async function refreshProjection({ force = false } = {}) {
+  if (state.syncing) return;
+  state.syncing = true;
+  if (!force) setSyncStatus("Updating…");
+  try {
+    const projection = await refreshPhoneProjection({
+      services: { getPhoneTodaySnapshot, listTaskView, listCategories, listTags, listWeekEvents }, store: projectionStore,
+    });
+    adoptProjection(projection);
+    setSyncStatus("");
+    if (!state.pending) renderCachedRoute();
+    syncFilterSelect("Category", state.categories, "All categories");
+    syncFilterSelect("Tag", state.tags, "All tags");
+  } catch {
+    setSyncStatus(state.cache ? "Offline · cached" : "Offline");
+  } finally { state.syncing = false; }
+}
+async function load() {
+  if (renderCachedRoute()) { refreshProjection(); return; }
+  return networkLoad();
+}
 function syncFilterSelect(label, items, allLabel) {
   const select = document.querySelector(`select[aria-label="${label}"]`);
   if (!select) return;
@@ -310,10 +365,23 @@ async function refreshReferenceData() {
 }
 async function autoRefresh() {
   if (state.pending) return;
-  await Promise.allSettled([load(), refreshReferenceData()]);
+  await Promise.allSettled([refreshProjection(), state.cache ? Promise.resolve() : refreshReferenceData()]);
 }
 window.addEventListener("popstate", () => navigate(phoneRoute(location.pathname), false));
-showRoute();
-load();
-refreshReferenceData().catch(() => {});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/phone/sw.js").catch(() => {});
+async function boot() {
+  const cached = await projectionStore.read();
+  if (cached) adoptProjection(cached);
+  showRoute();
+  if (cached) {
+    renderCachedRoute();
+    setSyncStatus("Cached");
+    refreshProjection();
+  } else {
+    // Preserve the established first-run Today request, then build the fuller
+    // bounded cache once that initial view is usable.
+    networkLoad().finally(() => refreshProjection());
+  }
+}
+boot();
 setInterval(autoRefresh, AUTO_REFRESH_MS);
