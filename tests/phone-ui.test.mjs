@@ -92,6 +92,8 @@ test("phone route and direct loads share the Site while tablet and root stay ava
   assert.match(script, /createPhoneProjectionStore/);
   assert.match(script, /refreshPhoneProjection/);
   assert.match(script, /navigator\.serviceWorker\.register/);
+  assert.match(script, /TODAY_TASK_LIMIT = 6/);
+  assert.match(script, /\.slice\(0, TODAY_TASK_LIMIT\)/);
   assert.match(script, /if \(state\.pending\) return/);
 });
 
