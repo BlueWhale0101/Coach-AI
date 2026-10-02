@@ -29,12 +29,19 @@ installing the supplied systemd unit.
 After this change is merged:
 
 ```bash
+sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin coach-ai
 git clone https://github.com/BlueWhale0101/Coach-AI.git /opt/coach-ai
 cd /opt/coach-ai
 npm ci --omit=dev --ignore-scripts
-sudo install -m 600 /dev/null /etc/coach-ai-mcp.env
+sudo install -o root -g coach-ai -m 640 /dev/null /etc/coach-ai-mcp.env
 sudoedit /etc/coach-ai-mcp.env
 ```
+
+The service unit runs under the dedicated non-login `coach-ai` account. Keep
+the checkout root-owned and readable by that account; it has no writable host
+state. `/etc/coach-ai-mcp.env` is readable only by `root` and the `coach-ai`
+group, so the process can read its action secret without gaining access to
+Assistant.AI's secrets or other host configuration.
 
 Enter these server-side variables using the existing Coach Action secret;
 never send that secret in chat or add it to plugin files:
