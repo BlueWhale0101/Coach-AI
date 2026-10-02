@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "coach-ai",
+  "version": "0.1.0",
+  "description": "Conversational fitness coaching and logging workflows for Coach.AI, using its existing private database tools when connected.",
+  "author": { "name": "Coach.AI" },
+  "repository": "https://github.com/BlueWhale0101/Coach-AI",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Coach.AI",
+        "shortDescription": "Fitness coaching and logging",
+        "longDescription": "Practical performance-aware coaching, conservative fitness log extraction, nutrition estimates, historical recall, corrections, daily review and trends. Database operations require the separately connected private Coach.AI MCP app.",
+        "developerName": "Coach.AI",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Coach me through today's training and meals.", "Review my recent progress.", "Help me log my workout."]
+      }
+    }
+  }
+}
