@@ -1,0 +1,21 @@
+[Unit]
+Description=Coach.AI private MCP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=coach-ai
+Group=coach-ai
+WorkingDirectory=/opt/coach-ai
+EnvironmentFile=/etc/coach-ai-mcp.env
+ExecStart=/usr/bin/node /opt/coach-ai/coach/mcp/server.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
