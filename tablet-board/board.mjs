@@ -1140,3 +1140,10 @@ async function autoRefresh() {
 
 loadCurrentView();
 setInterval(autoRefresh, AUTO_REFRESH_MS);
+
+// Installation support is optional and must never block the board.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/tablet-board/sw.js", { scope: "/tablet-board/" }).catch(() => {});
+  });
+}
