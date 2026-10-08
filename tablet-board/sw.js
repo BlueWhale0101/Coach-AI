@@ -32,19 +32,12 @@ self.addEventListener("fetch", event => {
   const key = navigation ? "/tablet-board/" : url.pathname;
   event.respondWith((async () => {
     const cache = await caches.open(SHELL);
-    try {
-      const response = await fetch(request);
-      if (response.ok && !response.redirected) {
-        // Navigation may carry query parameters; the cached shell is the canonical
-        // preloaded HTML, while the browser keeps its original URL and query.
-        if (!navigation) await cache.put(key, response.clone());
-        return response;
-      }
-      return (await cache.match(key)) || response;
-    } catch (error) {
-      const cached = await cache.match(key);
-      if (cached) return cached;
-      throw error;
-    }
+    // Installation preloads this version's complete public shell. Cache hits
+    // return immediately; updates arrive through the service-worker lifecycle.
+    const cached = await cache.match(key);
+    if (cached) return cached;
+    // A missing/evicted entry can still load online. Do not delay delivery with
+    // redundant cache writes or mix a newer deployment into this shell cache.
+    return fetch(request);
   })());
 });

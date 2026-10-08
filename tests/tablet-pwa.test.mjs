@@ -86,10 +86,25 @@ test("tablet shell supports offline routes/queries without caching API, phone, o
   for (const path of ["/api/household-board", "/api/list-tasks", "/phone/", "/tablet-board/missing.mjs", "https://other.test/tablet-board/"]) assert.equal(send(path), undefined);
   assert.equal(send("/api/complete-task", "cors", "POST"), undefined);
   assert.equal(send("/tablet-board/board.mjs?private=1", "cors"), undefined);
-  context.fetch = async () => new Response("fresh module");
-  assert.equal(await (await send("/tablet-board/board.mjs", "cors")).text(), "fresh module");
+  let networkCalls = 0;
+  context.fetch = async () => { networkCalls++; return new Response("network module"); };
+  for (const path of ["/tablet-board/board.mjs", "/tablet-board/styles.css", "/assistant-ui/tokens.css"]) {
+    assert.equal(await (await send(path, "cors")).text(), path);
+  }
+  assert.equal(await (await send("/tablet-board/tasks?search=a")).text(), "/tablet-board/");
+  assert.equal(networkCalls, 0, "cached startup and navigation must bypass the network");
+  const currentEntries = [...stores.values()][0];
+  currentEntries.delete("/tablet-board/board.mjs");
+  // A CacheStorage write must never gate delivery of a fetched response.
+  context.caches.open = async () => ({
+    match: async key => currentEntries.get(key)?.clone(),
+    put: () => { throw new Error("unexpected runtime cache write"); },
+  });
+  assert.equal(await (await send("/tablet-board/board.mjs", "cors")).text(), "network module");
+  assert.equal(networkCalls, 1);
+  assert.ok(!currentEntries.has("/tablet-board/board.mjs"));
   context.fetch = async () => { throw new Error("offline"); };
-  assert.equal(await (await send("/tablet-board/board.mjs", "cors")).text(), "fresh module");
+  await assert.rejects(send("/tablet-board/board.mjs", "cors"), /offline/);
   await cache("assistant-ai-phone-shell-v1").addAll(["/phone/"]);
   await cache("assistant-ai-tablet-shell-old").addAll([]);
   handlers.activate({ waitUntil: promise => { done = promise; } });

@@ -17,13 +17,13 @@ The tablet manifest has explicit identity, start URL, and scope `/tablet-board/`
 
 ## Offline shell and updates
 
-After a successful initial online visit and service-worker installation, tablet HTML, JS, CSS, manifest, and icons are available offline. Supported tablet navigation routes fall back to the canonical cached HTML while retaining the original URL/query. Public shell assets use network first with cache fallback. The build hashes shell contents into the tablet cache version. Updates activate after older controlled sessions close; close/reopen the installed app after deployment. Only old tablet caches are removed; phone caches are preserved.
+After a successful initial online visit and service-worker installation, tablet HTML, JS, CSS, manifest, and icons are available offline. Supported tablet navigation routes fall back to the canonical cached HTML while retaining the original URL/query. Public shell assets and supported navigation use cache first, so cached startup makes no network requests. Installation preloads the complete shell; cache misses fetch directly without waiting for cache writes or mixing newer deployment assets into the current version. The build hashes shell contents into the tablet cache version. Updates activate after older controlled sessions close; close/reopen the installed app after deployment. Only old tablet caches are removed; phone caches are preserved.
 
 No authenticated API responses or mutations are cached by this worker. Household data still uses the existing same-origin Projection/API boundary and requires connectivity. Offline shell availability does **not** mean offline household data or queued writes; existing connection errors may appear. No new data store or synchronization engine is added.
 
 ## Manual acceptance after authorized deployment
 
-Automated tests exercise manifest/asset delivery, PNG dimensions, route/query handling, offline shell fallback, network refresh, cache isolation, and API bypass. Physical Android installation and orientation behavior still require verification:
+Automated tests exercise manifest/asset delivery, PNG dimensions, route/query handling, offline shell fallback, cache-first startup, cache-miss delivery, cache isolation, and API bypass. Physical Android installation and orientation behavior still require verification:
 
 - Install and launch at the production URL; verify name/icon, standalone mode, landscape preference, and Board start URL.
 - At 1024×768 and 1080×810-class usable areas, expand a long task; verify independent task/calendar scrolling, contained buttons, divider/settings, and no document overflow.
