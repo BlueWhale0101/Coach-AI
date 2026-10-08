@@ -1,4 +1,5 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
@@ -8,6 +9,7 @@ const server = resolve(dist, "server");
 const binaryAsset = async (path, type) => ({ type, body: (await readFile(resolve(root, path))).toString("base64"), encoding: "base64" });
 
 const assets = {
+  "/tablet-board/manifest.webmanifest": { type: "application/manifest+json; charset=utf-8", body: await readFile(resolve(root, "tablet-board/manifest.webmanifest"), "utf8") },
   "/manifest.webmanifest": { type: "application/manifest+json; charset=utf-8", body: await readFile(resolve(root, "manifest.webmanifest"), "utf8") },
   "/icons/icon-32.png": await binaryAsset("icons/icon-32.png", "image/png"),
   "/icons/icon-192.png": await binaryAsset("icons/icon-192.png", "image/png"),
@@ -59,6 +61,14 @@ const assets = {
   "/phone/local-projection.mjs": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/local-projection.mjs"), "utf8") },
   "/phone/sw.js": { type: "text/javascript; charset=utf-8", body: await readFile(resolve(root, "phone/sw.js"), "utf8") },
   "/assistant-ui/tokens.css": { type: "text/css; charset=utf-8", body: await readFile(resolve(root, "assistant-ui/tokens.css"), "utf8") },
+};
+
+// Each deployed shell gets an isolated cache; activation retires only older tablet caches.
+const tabletServiceWorker = await readFile(resolve(root, "tablet-board/sw.js"), "utf8");
+const shellVersion = createHash("sha256").update(JSON.stringify(assets)).update(tabletServiceWorker).digest("hex").slice(0, 16);
+assets["/tablet-board/sw.js"] = {
+  type: "text/javascript; charset=utf-8",
+  body: tabletServiceWorker.replace("__TABLET_SHELL_VERSION__", shellVersion),
 };
 
 const worker = `const ASSETS = ${JSON.stringify(assets)};

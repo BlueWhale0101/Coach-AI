@@ -422,3 +422,6 @@ Next planned work:
 * Backfill from long-running ChatGPT fitness conversation
 * Admin support for import review
 * Continued coach voice tuning with sample responses
+## Tablet PWA installation
+
+See [Android tablet installation and deployment checks](docs/tablet-pwa.md) for the existing Assistant.AI household display.
