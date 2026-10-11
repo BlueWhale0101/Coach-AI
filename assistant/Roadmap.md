@@ -78,7 +78,7 @@ Provide an administrator-only, one-click operation that creates a downloadable, 
 
 **Immediate blocking dependency — Porter.AI V1 Knowledge migration**
 
-Porter.AI's Knowledge ownership migration is **paused** until a verified, one-time PostgreSQL backup has been created and safely stored outside Supabase.
+**Status update (2026-10-11):** A one-time **encrypted PostgreSQL backup has been created and transferred to Google Drive**. Record/check the integrity and restoration evidence for this migration safeguard separately; transfer alone does not prove restorability. The permanent monthly backup capability below is **not** a prerequisite to continuing the current Porter migration work.
 
 This short-term safety action is distinct from implementing the complete one-click backup product. Before resuming the migration, establish and record:
 
@@ -90,6 +90,29 @@ This short-term safety action is distinct from implementing the complete one-cli
 **Investigation before architecture selection**
 
 Inventory current Supabase resources and data volume; identify export/restore constraints on Supabase Free; compare secure approaches for database dumps, Storage downloads, packaging, administrator authentication, artifact delivery, and recovery verification. Propose phased implementation with explicit failure modes and acceptance tests. Do not select or build a particular architecture based solely on this roadmap entry.
+
+**Follow-up backlog: fully unattended monthly system backups (2026-10-11)**
+
+**Status:** Requirement recorded; investigation and architecture proposal pending. **Not implemented.** Do not interrupt current Porter migration work or interpret this entry as authorization to implement.
+
+**Goal and coverage:** Once per month, automatically create and retain a recoverable, encrypted backup of the **entire shared Supabase project**, spanning Assistant.AI, Coach.AI, Porter.AI, PostgreSQL application/platform schemas and data, Auth, migration history, and **actual Supabase Storage object bytes and metadata**. Preserve the broader recovery scope above for Edge Functions, deployment configuration, and secrets (handled separately as appropriate).
+
+**Required behavior**
+
+- Run unattended monthly, independent of an active ChatGPT session, a conversational agent, or manual initiation.
+- Use a PostgreSQL `pg_dump` version compatible with the hosted PostgreSQL server; explicitly assess the full-project export/restore scope and platform restrictions.
+- Encrypt artifacts **before** any Google Drive upload. Define key custody, rotation/recovery, and a restoration path that does not depend on a single ephemeral VPS secret.
+- Keep **only the most recent successful backup** on the VPS during normal steady state; retain older VPS backups until a replacement is verified and safely uploaded, and define cleanup/space-pressure behavior on failures.
+- Upload encrypted backups to Google Drive and retain historical monthly recovery points there. Define naming, retention, quota, upload authentication, and how to detect partial or corrupted remote uploads.
+- Verify dump/Storage inventory, manifest and checksums, encryption, remote upload completeness, and success **before** deleting older local backups. A successful command exit alone is not proof of recoverability.
+- Report failed or missed scheduled runs through Assistant.AI so failures cannot be silently missed. Define durable status, actionable alerts, and recovery/retry behavior if Assistant.AI itself is unavailable.
+- Maintain a documented, repeatable restore procedure and periodically test restoration in isolation, including Auth, Storage, relationships, and representative application operations.
+
+**Architecture investigation (no selection yet)**
+
+Compare a VPS `systemd` timer (or cron) running a least-privilege backup job, with either (a) direct authenticated Google Drive upload or (b) upload mediated through an Assistant.AI MCP workflow. Favor reliable headless execution with no ChatGPT dependency. Evaluate whether MCP adds unnecessary availability coupling; credential scope and storage, token refresh, encryption/key management, free-tier constraints, disk-space requirements, locking/concurrency, idempotent retries, partial-failure recovery, remote retention, observability, and restore drills. Keep Assistant.AI as the administrative owner without pushing domain-specific backup logic into Coach.AI or Porter.AI.
+
+**Phasing:** Existing one-time encrypted PostgreSQL export to Google Drive is a completed manual safeguard, **not** the permanent system-wide backup product. Investigate and propose an architecture, threat model, recovery objectives, and acceptance tests before implementing unattended monthly operation.
 
 ## User feedback
 
