@@ -53,6 +53,44 @@ Target interaction pattern:
 
 `ChatGPT for semantic interaction -> Coach.AI plugin -> Supabase durable state -> Site for browsing and visualization`
 
+### 4. System Backup & Recovery — ecosystem infrastructure (high priority)
+
+**Status:** Product requirement accepted for investigation and planning; architecture and implementation are not yet authorized.
+
+**Ownership and scope**
+
+Assistant.AI is the top-level administrative owner of the shared Supabase project used by Assistant.AI, Coach.AI, and Porter.AI. Backup and recovery must be an Assistant.AI infrastructure capability covering the **entire shared system**, not duplicated in the individual application modules. The project currently uses Supabase Free without managed backups.
+
+**Product goal**
+
+Provide an administrator-only, one-click operation that creates a downloadable, portable, independently verifiable backup of the whole system. Initial delivery is a manual download to local disk; later enhancements may include scheduled backups and off-site storage (Google Drive is a candidate, not a decision).
+
+**Recovery coverage and requirements**
+
+- Full PostgreSQL database: application and platform schemas, table data, relationships, constraints, roles/permissions as needed for recovery, Supabase Auth data, and migration history. Investigate which platform-managed elements are exportable and how to restore them safely.
+- Supabase Storage: object bytes **and** the metadata/relationships needed to recover buckets and references, including original Porter.AI ticket artifacts. A PostgreSQL dump alone is insufficient.
+- Versioned backup manifest: scope, timestamp, component versions, inventory, sizes, checksums, and format/procedure version. Detect missing, truncated, or corrupted components.
+- Backup verification: validate the export and checksums; document what each verification level proves and what it does not prove.
+- Secure administrator-only invocation and delivery, with no database credentials, service-role secrets, or privileged tokens exposed to the browser. Define authorization, temporary artifact handling, retention, and cleanup.
+- Documented, repeatable, **tested** restoration procedure in an isolated environment. Validate restored data, relationships, Auth and Storage linkage, and representative Assistant/Coach/Porter functionality. Distinguish successful export from proven recovery.
+- Account separately for Edge Function source and deployments, repository state, runtime/service configuration, Supabase project settings, external services/tunnels, and secrets. Define recovery inventory and safe re-provisioning for secrets; do not assume these are included in database/Storage exports.
+- Avoid adding backup-specific responsibilities to Coach.AI or Porter.AI domain boundaries.
+
+**Immediate blocking dependency — Porter.AI V1 Knowledge migration**
+
+Porter.AI's Knowledge ownership migration is **paused** until a verified, one-time PostgreSQL backup has been created and safely stored outside Supabase.
+
+This short-term safety action is distinct from implementing the complete one-click backup product. Before resuming the migration, establish and record:
+
+1. A database export covering the relevant PostgreSQL schemas/data, Auth, and migration history, with any export limitations made explicit.
+2. An independently stored local/off-Supabase copy and an integrity check (e.g., checksum plus basic archive/dump validation).
+3. A documented restoration approach and, where feasible, a test restore or equivalent verification appropriate to the migration risk.
+4. Clear confirmation that the prerequisite is satisfied before executing the ownership migration.
+
+**Investigation before architecture selection**
+
+Inventory current Supabase resources and data volume; identify export/restore constraints on Supabase Free; compare secure approaches for database dumps, Storage downloads, packaging, administrator authentication, artifact delivery, and recovery verification. Propose phased implementation with explicit failure modes and acceptance tests. Do not select or build a particular architecture based solely on this roadmap entry.
+
 ## User feedback
 
 Add observations here during the stabilization period. Record what happened in normal use before deciding on a solution.
