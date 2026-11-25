@@ -1,3 +1,4 @@
+import { validZone } from "./view-helpers.mjs";
 export const DISPLAY_SETTINGS_KEY = "assistant.tabletBoard.displaySettings.v1";
 
 export const DEFAULT_DISPLAY_SETTINGS = Object.freeze({
@@ -40,6 +41,7 @@ export function normalizeDisplaySettings(value = {}) {
   const categoryTint = CATEGORY_TINT_ALPHA[value.categoryTint] ? value.categoryTint : DEFAULT_DISPLAY_SETTINGS.categoryTint;
 
   return {
+    ...(validZone(value.timezone) ? { timezone: value.timezone } : {}),
     textScale: Math.round(clampNumber(value.textScale, LIMITS.textScale, DEFAULT_DISPLAY_SETTINGS.textScale)),
     taskSplitPercent: roundTo(clampNumber(value.taskSplitPercent, LIMITS.taskSplitPercent, DEFAULT_DISPLAY_SETTINGS.taskSplitPercent), 1),
     visibleHours: VISIBLE_HOUR_OPTIONS.includes(visibleHours) ? visibleHours : DEFAULT_DISPLAY_SETTINGS.visibleHours,

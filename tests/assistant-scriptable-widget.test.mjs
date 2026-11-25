@@ -69,7 +69,7 @@ test("deadline and event labels use Darwin boundaries without manufacturing a du
 test("last success cache is scoped to the public endpoint and rejects missing auth", () => {
   const snapshot = widget.parseSnapshot(response);
   const cache = JSON.stringify({ endpoint, snapshot });
-  assert.deepEqual(widget.snapshotFromCache(cache, endpoint), snapshot);
+  assert.deepEqual(widget.snapshotFromCache(cache, endpoint, new Date(generated)), snapshot);
   assert.equal(widget.snapshotFromCache(cache, "https://different.supabase.co/functions/v1/get-client-today"), null);
   assert.equal(widget.canUseCache(new Error("Network unavailable")), true);
   assert.equal(widget.canUseCache(new Error("Device token rejected")), false);
@@ -132,11 +132,11 @@ test("Scriptable entrypoint stores a token in Keychain, uses cached data offline
     SFSymbol: { named: () => null },
     FileManager: { local: () => fileManager },
     Keychain: { contains: key => keys.has(key), get: key => keys.get(key), set: (key, value) => keys.set(key, value) },
-    Alert: FakeAlert, Intl, Date, JSON, Promise, Object, String,
+    Alert: FakeAlert, Intl, Date: class extends Date { constructor(...args) { super(...(args.length ? args : [generated])); } }, JSON, Promise, Object, String,
     args: { widgetParameter: "tasks" }, config: { runsInWidget: false },
   };
   const labels = value => value.text.flatMap(item => typeof item === "string" ? [item] : labels(item));
-  async function execute() {
+  async function execute(manual = "") {
     let complete;
     const finished = new Promise(resolve => { complete = resolve; });
     globals.Script = { setWidget(value) { rendered = value; }, complete };
@@ -145,14 +145,14 @@ test("Scriptable entrypoint stores a token in Keychain, uses cached data offline
       async loadString() {
         received.headers = this.headers;
         if (requestStatus === 0) throw Error("offline");
-        return requestStatus === 200 ? JSON.stringify(response) : JSON.stringify({ ok: false, code: "UNAUTHORIZED" });
+        return requestStatus === 200 ? JSON.stringify({ok: true, data: {...response.data, date: new Intl.DateTimeFormat("sv-SE").format(new Date(generated)), timezone: new URL(received.url).searchParams.get("timezone")}}) : JSON.stringify({ ok: false, code: "UNAUTHORIZED" });
       }
     };
-    vm.runInNewContext(source, { ...globals });
+    vm.runInNewContext(source.replace('const MANUAL_TIMEZONE = "";', "const MANUAL_TIMEZONE = " + JSON.stringify(manual) + ";"), { ...globals });
     await finished;
   }
   await execute();
-  assert.equal(received.url, endpoint);
+  assert.equal(received.url, endpoint + "?timezone=" + encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone));
   assert.equal(received.headers.Authorization, `Bearer ${"a".repeat(64)}`);
   assert.equal(keys.size, 1);
   assert.equal(rendered.url, site + "/phone/tasks");
@@ -165,6 +165,13 @@ test("Scriptable entrypoint stores a token in Keychain, uses cached data offline
   assert.ok(labels(rendered).includes("Pay bill"));
   assert.ok(labels(rendered).some(value => value.startsWith("Saved ")));
 
+  const saved = [...files.values()].find(value => value.includes("generated_at"));
+  assert.equal(JSON.parse(saved).snapshot.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
+  await execute("Pacific/Kiritimati");
+  assert.ok(received.url.endsWith("timezone=Pacific%2FKiritimati"));
+  assert.ok(labels(rendered).includes("Refresh for current tasks"));
+  assert.ok(labels(rendered).some(label => label.startsWith("Partial cache")));
+  assert.ok([...files.values()].includes(saved), "offline override preserves authoritative cache");
   requestStatus = 401;
   await execute();
   assert.equal(labels(rendered).includes("Pay bill"), false);

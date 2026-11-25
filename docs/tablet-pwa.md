@@ -33,3 +33,5 @@ Automated tests exercise manifest/asset delivery, PNG dimensions, route/query ha
 - Republish an update, close all tablet windows, reopen, and verify the updated shell and isolated cache cleanup.
 
 Chrome references: https://developer.chrome.com/docs/capabilities/pwa-manifest-id and https://developer.chrome.com/docs/devtools/progressive-web-apps
+
+For the household time zone default, local override and installed-version upgrade checks, see [Display time zone](display-time-zone.md).

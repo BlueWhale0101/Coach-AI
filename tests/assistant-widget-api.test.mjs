@@ -107,3 +107,19 @@ test("widget is a dedicated Edge Function, absent from the private Site's API ro
   assert.match(docs, /functions\/v1\/get-client-today/);
   assert.doesNotMatch(docs, /Bearer <.*(?:ACTION_API_SECRET|SERVICE_ROLE_KEY)/);
 });
+
+test("widget accepts only a single named zone, and returns the projection's zone", async () => {
+  let calls = 0;
+  const handler = createWidgetTodayHandler({
+    repository: { getPhoneToday: async ({timezone}) => { calls++; return { ...board, metadata: {...board.metadata, timezone} }; } },
+    credentials: { find: async () => ({ scope: "widget:today:read" }) },
+  });
+  const get = query => handler(new Request(endpoint + query, {headers: {authorization: "Bearer " + token}}));
+  for (const query of ["?timezone=", "?timezone=Mars/Base", "?timezone=%2B09:30", "?timezone=UTC&timezone=UTC", "?timezone=UTC&x=y"]) {
+    assert.equal((await get(query)).status, 400);
+  }
+  assert.equal(calls, 0);
+  for (const [query, zone] of [["", "Australia/Darwin"], ["?timezone=America%2FLos_Angeles", "America/Los_Angeles"]]) {
+    assert.equal((await (await get(query)).json()).data.timezone, zone);
+  }
+});

@@ -28,8 +28,11 @@ export function addDays(date, days) {
   return next;
 }
 
+const dateFormatters = new Map();
 export function localDateKey(date = new Date(), timezone = "Australia/Darwin") {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  if (!dateFormatters.has(timezone)) dateFormatters.set(timezone,
+    new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }));
+  const parts = dateFormatters.get(timezone).formatToParts(date);
   const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
@@ -42,10 +45,13 @@ export function localTimeMinutes(date = new Date(), timezone = "Australia/Darwin
 
 export function zonedMidnightUtc(date, timezone = "Australia/Darwin") {
   const at = Date.parse(`${date}T00:00:00Z`);
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(at));
-  const p = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  const offset = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second)) - at;
-  return new Date(at - offset).toISOString();
+  // Find the first instant of this civil date, including when local midnight is skipped.
+  let lo = at - 36 * 3600000, hi = at + 36 * 3600000;
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (localDateKey(mid, timezone) < date) lo = mid; else hi = mid;
+  }
+  return new Date(hi).toISOString();
 }
 
 export function startOfWeek(date = new Date(), timezone = "Australia/Darwin") {
@@ -90,4 +96,23 @@ export function bindTaskDoubleTap(card, task, { full, complete, cancelClick }) {
     cancelClick();
     complete(task);
   });
+}
+
+export const householdZone = "Australia/Darwin";
+export function validZone(zone) {
+  if (typeof zone !== "string" || !zone || /^[+-]/.test(zone)) return false;
+  try { new Intl.DateTimeFormat("en", { timeZone: zone }); return true; } catch { return false; }
+}
+export function deviceZone() {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (validZone(zone)) return zone;
+  } catch {}
+  return householdZone;
+}
+export function onDay(event, day, zone) {
+  if (event.time_kind === "all_day") return event.start_date <= day && event.end_date > day;
+  if (!event.starts_at) return event.date === day; // fixture-only rows
+  return localDateKey(new Date(event.starts_at), zone) <= day &&
+    localDateKey(new Date(Date.parse(event.ends_at) - 1), zone) >= day;
 }

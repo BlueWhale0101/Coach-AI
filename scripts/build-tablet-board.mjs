@@ -66,6 +66,7 @@ const assets = {
 // Each deployed shell gets an isolated cache; activation retires only older tablet caches.
 const tabletServiceWorker = await readFile(resolve(root, "tablet-board/sw.js"), "utf8");
 const shellVersion = createHash("sha256").update(JSON.stringify(assets)).update(tabletServiceWorker).digest("hex").slice(0, 16);
+assets["/phone/sw.js"].body = assets["/phone/sw.js"].body.replace("__PHONE_SHELL_VERSION__", shellVersion);
 assets["/tablet-board/sw.js"] = {
   type: "text/javascript; charset=utf-8",
   body: tabletServiceWorker.replace("__TABLET_SHELL_VERSION__", shellVersion),

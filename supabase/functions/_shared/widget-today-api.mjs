@@ -33,7 +33,7 @@ export function compactWidgetToday(board) {
       category: event.category && { name: event.category.name, color: event.category.color },
       url: "/phone/calendar",
     }));
-  return { date: today, timezone: "Australia/Darwin", generated_at: metadata.generated_at,
+  return { date: today, timezone: metadata.timezone, generated_at: metadata.generated_at,
     tasks, events, url: "/phone/" };
 }
 
@@ -42,7 +42,13 @@ export function createWidgetTodayHandler({ repository, credentials, configured =
     if (request.method !== "GET") return error("METHOD_NOT_ALLOWED", 405);
     if (!configured) return error("SERVER_CONFIG_ERROR", 503);
     const url = new URL(request.url);
-    if (url.search) return error("INVALID_REQUEST", 400);
+    const params = [...url.searchParams];
+    if (params.length > 1 || (params.length && params[0][0] !== "timezone")) return error("INVALID_REQUEST", 400);
+    const timezone = url.searchParams.get("timezone") ?? "Australia/Darwin";
+    try {
+      if (!timezone || /^[+-]/.test(timezone)) throw new RangeError();
+      new Intl.DateTimeFormat("en", { timeZone: timezone });
+    } catch { return error("INVALID_TIMEZONE", 400); }
     const match = /^Bearer ([0-9a-f]{64})$/i.exec(request.headers.get("authorization") ?? "");
     if (!match) return error("UNAUTHORIZED", 401);
     try {
@@ -53,7 +59,7 @@ export function createWidgetTodayHandler({ repository, credentials, configured =
       const now = clock();
       if (!credential || credential.revoked_at || credential.scope !== "widget:today:read" ||
           (credential.expires_at && Date.parse(credential.expires_at) <= now.getTime())) return error("UNAUTHORIZED", 401);
-      const board = await repository.getPhoneToday({ display_date: null, timezone: "Australia/Darwin", now: now.toISOString(), task_limit: 30 });
+      const board = await repository.getPhoneToday({ display_date: null, timezone, now: now.toISOString(), task_limit: 30 });
       return json({ ok: true, data: compactWidgetToday(board) });
     } catch {
       return error("SERVICE_UNAVAILABLE", 503);

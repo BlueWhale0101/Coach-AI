@@ -203,3 +203,7 @@ There is an eventual floor imposed by iOS launching the PWA/WebKit process after
 **Priority**
 
 This is a high-value optimization because the phone UI is intended for quick interaction. A reduction from a noticeable cold-start pause toward an immediate-feeling last-known-good view is likely to improve actual use more than adding several new Assistant features.
+
+### Backlog investigation: Google Calendar event zone metadata
+
+A California import was observed with correct absolute timestamps but incorrect stored event time zone metadata. Trace source calendar defaults, explicit per-event zone and normalization through reconciliation; establish affected scope and fixtures before proposing any remediation. Separate from client display preferences. Do not infer or shift stored instants from the display zone.

@@ -6,13 +6,13 @@ export const phoneRoute = path => DESTINATIONS.includes(path.replace(/^\/phone\/
   ? path.replace(/^\/phone\/?/, "").replace(/\/$/, "") : "today";
 export const phonePath = route => route === "today" ? "/phone/" : `/phone/${route}`;
 export const shiftDay = (key, days) => isoDate(addDays(new Date(`${key}T12:00:00Z`), days));
-export const todayKey = (now = new Date()) => localDate(now, DEFAULT_TIMEZONE);
+export const todayKey = (now = new Date(), zone = DEFAULT_TIMEZONE) => localDate(now, zone);
 export const taskActions = task => taskActionsForStatus(task.status);
 
 export function attentionTasks(snapshot) {
-  const day = snapshot.metadata?.today ?? todayKey(new Date(snapshot.now));
+  const day = snapshot.metadata?.today ?? todayKey(new Date(snapshot.now), snapshot.timezone);
   return snapshot.tasks.filter(task => task.pinned || task.deadlineLabel === "OVERDUE" ||
-    (task.due_at && localDate(task.due_at, DEFAULT_TIMEZONE) === day) ||
+    (task.due_at && localDate(task.due_at, snapshot.timezone) === day) ||
     task.surface_reason === "actionable" || (task.not_before && Date.parse(task.not_before) <= Date.parse(snapshot.now)));
 }
 

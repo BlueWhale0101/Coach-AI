@@ -4,7 +4,7 @@ This is a read-only projection of the existing Phone Today result for a trusted 
 
 ## Request
 
-`GET https://<supabase-project>.supabase.co/functions/v1/get-client-today`, with `Authorization: Bearer <device token>`. No query parameters or request body. The Supabase project/function URL is public configuration, not a secret. The device token is 32 random bytes encoded as 64 hexadecimal characters. Send it only in the header over HTTPS; do not put it in a URL or in the phone page's browser code.
+`GET https://<supabase-project>.supabase.co/functions/v1/get-client-today`, with `Authorization: Bearer <device token>`. Optional single query parameter `timezone` (e.g. `?timezone=America%2FLos_Angeles`); omitted means Australia/Darwin. No request body. Invalid zones, duplicate or unknown parameters are rejected. The Supabase project/function URL is public configuration, not a secret. The device token is 32 random bytes encoded as 64 hexadecimal characters. Send it only in the header over HTTPS; do not put it in a URL or in the phone page's browser code.
 
 The dedicated Edge Function hashes the device token with SHA-256, looks up the digest using its server-side service role, checks the exact `widget:today:read` scope and optional expiration/revocation, and calls `assistant_get_phone_today`. It returns `Cache-Control: no-store`. The device token is the only client credential and cannot authorize any other Assistant capability. No service-role key, action secret, or other server credential is sent to or returned to the client. This function is configured with `verify_jwt = false` so Supabase can pass the device bearer token to its own validator.
 

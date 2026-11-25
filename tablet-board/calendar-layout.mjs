@@ -13,7 +13,7 @@ export function formatTime(time) {
   const hour = Math.floor(minutes / 60);
   const minute = minutes % 60;
   const displayHour = ((hour + 11) % 12) + 1;
-  const suffix = hour >= 12 ? "PM" : "AM";
+  const suffix = hour % 24 >= 12 ? "PM" : "AM";
   return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 

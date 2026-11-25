@@ -4,7 +4,19 @@ const SITE_URL = "https://assistant-tablet-board-v0.iona-skye-eller.chatgpt.site
 const TOKEN_KEY = "assistant.ai.widget.v1.device-token";
 const CONFIG_FILE = "assistant-ai-widget-config.json";
 const CACHE_FILE = "assistant-ai-widget-last-success.json";
-const TIMEZONE = "Australia/Darwin";
+// Shared by all modes. Leave blank to follow the device, or set an IANA name.
+const MANUAL_TIMEZONE = "";
+function resolveZone(manual = "", detected) {
+  if (detected === undefined) {
+    try { detected = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch {}
+  }
+  for (const zone of [manual, detected]) {
+    if (!zone || /^[+-]/.test(zone)) continue;
+    try { new Intl.DateTimeFormat("en", { timeZone: zone }); return zone; } catch {}
+  }
+  return "Australia/Darwin";
+}
+let TIMEZONE = "Australia/Darwin";
 const MODES = { tasks: "/phone/tasks", calendar: "/phone/calendar", today: "/phone/" };
 const PALETTE = {
   background: "#17191C", surface: "#202328", text: "#F4F5F6",
@@ -59,9 +71,9 @@ function categoryColor(item) {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : PALETTE.category;
 }
 
-function parseSnapshot(envelope) {
+function parseSnapshot(envelope, expectedZone = TIMEZONE) {
   const value = envelope?.data;
-  if (envelope?.ok !== true || !value || value.timezone !== TIMEZONE ||
+  if (envelope?.ok !== true || !value || value.timezone !== expectedZone ||
       !/^\d{4}-\d{2}-\d{2}$/.test(value.date) ||
       !Number.isFinite(Date.parse(value.generated_at)) ||
       !Array.isArray(value.tasks) || !Array.isArray(value.events)) {
@@ -74,7 +86,7 @@ function parseSnapshot(envelope) {
         !/^\d{4}-\d{2}-\d{2}$/.test(item.date) || (!item.all_day && !Number.isFinite(Date.parse(item.starts_at))))) {
     throw new Error("Unexpected widget response");
   }
-  return { date: value.date, generated_at: value.generated_at, tasks, events };
+  return { timezone: value.timezone, date: value.date, generated_at: value.generated_at, tasks, events };
 }
 
 function selectRows(snapshot, mode) {
@@ -124,10 +136,17 @@ function section(widget, title) {
   widget.addSpacer(5);
 }
 
-function snapshotFromCache(raw, endpoint) {
+function snapshotFromCache(raw, endpoint, now = new Date()) {
   const saved = JSON.parse(raw);
   if (saved.endpoint !== endpoint) return null;
-  return parseSnapshot({ ok: true, data: { ...saved.snapshot, timezone: TIMEZONE } });
+  const source = { timezone: "Australia/Darwin", ...saved.snapshot }; // v1 omitted its fixed zone.
+  const snapshot = parseSnapshot({ ok: true, data: source }, source.timezone);
+  if (snapshot.timezone === TIMEZONE && snapshot.date === localDate(now)) return snapshot;
+  // A bounded widget snapshot cannot reconstruct the task selection for a different day.
+  const date = localDate(now);
+  const events = snapshot.events.filter(e => e.all_day ? e.date >= date : Date.parse(e.ends_at) > now.getTime())
+    .map(e => e.all_day ? e : { ...e, date: localDate(e.starts_at) });
+  return { ...snapshot, date, partial: true, tasks: [], events };
 }
 
 function canUseCache(problem) {
@@ -154,14 +173,14 @@ function renderWidget(snapshot, mode, { cached = false, now = new Date() } = {})
   createText(header, `ASSISTANT · ${mode.toUpperCase()}`, 12, PALETTE.text, "bold");
   header.addSpacer();
   createText(header, new Intl.DateTimeFormat("en-AU", {
-    timeZone: TIMEZONE, day: "numeric", month: "short",
+    timeZone: "UTC", day: "numeric", month: "short",
   }).format(new Date(`${snapshot.date}T12:00:00Z`)), 11, PALETTE.muted);
   widget.addSpacer(9);
 
   const selected = selectRows(snapshot, mode);
   if (mode !== "calendar") {
     if (mode === "today") section(widget, "Tasks");
-    if (!selected.tasks.length) createText(widget, "Nothing needing attention", 14, PALETTE.secondary);
+    if (!selected.tasks.length) createText(widget, snapshot.partial ? "Refresh for current tasks" : "Nothing needing attention", 14, PALETTE.secondary);
     selected.tasks.forEach((task, index) => {
       if (index) widget.addSpacer(mode === "tasks" ? 12 : 7);
       const label = taskDue(task, snapshot.date, now);
@@ -173,7 +192,7 @@ function renderWidget(snapshot, mode, { cached = false, now = new Date() } = {})
   if (mode === "today") widget.addSpacer(10);
   if (mode !== "tasks") {
     if (mode === "today") section(widget, "Next");
-    if (!selected.events.length) createText(widget, "No upcoming events", 14, PALETTE.secondary);
+    if (!selected.events.length) createText(widget, snapshot.partial ? "No saved upcoming events" : "No upcoming events", 14, PALETTE.secondary);
     selected.events.forEach((event, index) => {
       if (index) widget.addSpacer(8);
       row(widget, event, eventTime(event, snapshot.date, now));
@@ -183,7 +202,7 @@ function renderWidget(snapshot, mode, { cached = false, now = new Date() } = {})
   widget.addSpacer();
   const footer = widget.addStack();
   const updated = localTime(snapshot.generated_at);
-  createText(footer, `${cached ? "Saved" : "Updated"} ${updated}`, 10, PALETTE.muted);
+  createText(footer, `${snapshot.partial ? "Partial cache · saved" : cached ? "Saved" : "Updated"} ${updated}`, 10, PALETTE.muted);
   return widget;
 }
 
@@ -235,7 +254,7 @@ async function askToken() {
 }
 
 async function loadData(endpoint, token) {
-  const request = new Request(endpoint);
+  const request = new Request(endpoint + "?timezone=" + encodeURIComponent(TIMEZONE));
   request.method = "GET";
   request.headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
   request.timeoutInterval = 12;
@@ -252,6 +271,7 @@ async function loadData(endpoint, token) {
 }
 
 async function runScriptable() {
+  TIMEZONE = resolveZone(MANUAL_TIMEZONE);
   const interactive = !config.runsInWidget;
   const mode = modeFromParameter(args.widgetParameter);
   const files = FileManager.local();
@@ -296,7 +316,7 @@ async function runScriptable() {
   }
   if (failure && interactive) await alert("Assistant.AI widget", failure.message);
   const widget = snapshot ? renderWidget(snapshot, mode, { cached }) : messageWidget(mode,
-    failure?.message === "Device token rejected" ? "Open Scriptable to update your token" : "Open Scriptable to check the widget");
+    failure?.message === "Device token rejected" ? "Open Scriptable to update your token" : "No current selection for " + TIMEZONE);
   Script.setWidget(widget);
   if (interactive) await widget.presentMedium();
   Script.complete();
@@ -304,12 +324,12 @@ async function runScriptable() {
 
 // Node tests load the pure helpers; Scriptable executes the native widget entrypoint.
 if (typeof ListWidget === "undefined") {
-  module.exports = { localDate, localTime, taskDue, eventTime, categoryColor, parseSnapshot,
+  module.exports = { resolveZone, localDate, localTime, taskDue, eventTime, categoryColor, parseSnapshot,
     selectRows, modeFromParameter, validEndpoint, snapshotFromCache, canUseCache, MODES };
 } else {
   runScriptable().catch(async problem => {
     if (!config.runsInWidget) await alert("Assistant.AI widget", problem.message);
-    Script.setWidget(messageWidget("today", "Open Scriptable to check the widget"));
+    Script.setWidget(messageWidget("today", "No current selection for " + TIMEZONE));
     Script.complete();
   });
 }

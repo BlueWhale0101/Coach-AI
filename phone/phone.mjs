@@ -1,5 +1,5 @@
 import {
-  archiveKnowledge, cancelTask, completeTask, dateLabel, DEFAULT_TIMEZONE,
+  archiveKnowledge, cancelTask, completeTask, dateLabel, dueLabel,
   getPhoneTodaySnapshot, listCategories, listKnowledgeView, listTags, listTaskView,
   listWeekEvents, pinObject, unpinObject, updateKnowledge, updateTask,
 } from "../tablet-board/data-provider.mjs";
@@ -8,7 +8,8 @@ import { node } from "./dom.mjs";
 import { createPhoneLoader } from "./load-view.mjs";
 import { agendaForDay, attentionTasks, DESTINATIONS, phonePath, phoneRoute, shiftDay, taskActions, todayKey, upcomingEvents } from "./view-model.mjs";
 import { createPhoneProjectionStore } from "./cache.mjs";
-import { cachedEvents, cachedTasks, refreshPhoneProjection } from "./local-projection.mjs";
+import { deviceZone, validZone } from "../tablet-board/view-helpers.mjs";
+import { provisionalToday, cachedEvents, cachedTasks, refreshPhoneProjection } from "./local-projection.mjs";
 
 const root = document.querySelector("#phone-root");
 const nav = document.querySelector("#phone-nav");
@@ -16,8 +17,36 @@ const strip = document.querySelector("#phone-undo");
 const staging = new StagedMutationController();
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
 const TODAY_TASK_LIMIT = 6;
+const zoneKey = "assistant.phone.displayZone";
+function resolveZone() {
+  let manual;
+  try { manual = localStorage.getItem(zoneKey); } catch {}
+  return validZone(manual) ? manual : deviceZone();
+}
+let zone = resolveZone();
+let generation = 0;
+const currentDay = () => todayKey(new Date(), zone);
+function checkZone() {
+  const next = resolveZone();
+  if (next === zone && state.referenceDay === currentDay()) return;
+  zone = next;
+  generation++; state.request++; state.syncing = false;
+  state.day = state.referenceDay = currentDay();
+  state.snapshot = null; state.items = [];
+  showRoute(); load();
+}
+function chooseZone() {
+  let saved = "";
+  try { saved = localStorage.getItem(zoneKey) || ""; } catch {}
+  const input = prompt("Display time zone (IANA name). Leave blank to follow device.", saved);
+  if (input === null) return;
+  const value = input.trim();
+  if (value && !validZone(value)) return alert("Use a zone such as America/Los_Angeles.");
+  try { localStorage.setItem(zoneKey, value); } catch { return alert("Could not save this display preference."); }
+  checkZone();
+}
 const state = {
-  route: phoneRoute(location.pathname), day: todayKey(), items: [], snapshot: null,
+  route: phoneRoute(location.pathname), day: currentDay(), referenceDay: currentDay(), items: [], snapshot: null,
   categories: [], tags: [], tag: "", query: { tasks: "", knowledge: "" }, status: "open",
   category: { tasks: "", knowledge: "" }, expanded: null, pending: null,
   request: 0, searchTimer: null, cache: null, syncing: false, syncStatus: "",
@@ -124,7 +153,7 @@ function detailCard(item, type) {
   if (type === "task") {
     if (item.pinned) meta.push("Pinned");
     if (item.deadlineLabel) meta.push(item.deadlineLabel);
-    if (item.due_at) meta.push(`Due ${new Intl.DateTimeFormat("en-AU", { timeZone: DEFAULT_TIMEZONE, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.due_at))}`);
+    if (item.due_at) meta.push(`Due ${new Intl.DateTimeFormat("en-AU", { timeZone: zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.due_at))}`);
     if (item.status !== "open") meta.push(item.status);
   } else {
     if (item.pinned) meta.push("Pinned");
@@ -181,12 +210,12 @@ function renderResults() {
       .filter(item => item.status !== "completed" && item.status !== "cancelled")
       .slice(0, TODAY_TASK_LIMIT);
     const taskSection = section("Needs attention", tasks.length);
-    taskSection.append(...(tasks.length ? tasks.map(item => detailCard(item, "task")) : [empty("Nothing pressing right now.")]));
+    taskSection.append(...(tasks.length ? tasks.map(item => detailCard(item, "task")) : [empty(snapshot.provisional ? "Refresh to see tasks for this day." : "Nothing pressing right now.")]));
     results.appendChild(taskSection);
     const today = snapshot.days[0];
     const schedule = section("Today's schedule");
     schedule.append(...today.allDay.map(event => eventCard(event, true)), ...today.events.map(event => eventCard(event)));
-    if (!today.allDay.length && !today.events.length) schedule.append(empty("No events today."));
+    if (!today.allDay.length && !today.events.length) schedule.append(empty(snapshot.provisional ? "No saved events for this day." : "No events today."));
     results.appendChild(schedule);
     const next = upcomingEvents(snapshot.days, snapshot.now);
     if (next.length) {
@@ -255,12 +284,13 @@ function searchControls(route) {
 function showRoute() {
   root.replaceChildren();
   const title = { today: "Today", tasks: "Tasks", calendar: "Calendar", knowledge: "Knowledge" }[state.route];
-  root.appendChild(heading(title, state.route === "today" ? dateLabel(todayKey()) : "ASSISTANT.AI"));
+  root.appendChild(heading(title, state.route === "today" ? dateLabel(currentDay()) : "ASSISTANT.AI"));
+  root.querySelector(".page-header")?.append(button(zone, chooseZone));
   if (state.route === "tasks" || state.route === "knowledge") root.appendChild(searchControls(state.route));
   if (state.route === "calendar") {
     const controls = node("div", "date-nav");
     controls.append(button("‹ Previous", () => navigateDay(-1)));
-    controls.append(button("Today", () => { state.day = todayKey(); showRoute(); load(); }));
+    controls.append(button("Today", () => { state.day = currentDay(); showRoute(); load(); }));
     controls.append(button("Next ›", () => navigateDay(1)));
     root.append(controls, node("h2", "agenda-date", dateLabel(state.day)));
   }
@@ -288,7 +318,7 @@ function navigate(route, push = true) {
 }
 const networkLoad = createPhoneLoader({
   state,
-  services: { getPhoneTodaySnapshot, listTaskView, listKnowledgeView, listWeekEvents },
+  services: { getPhoneTodaySnapshot: () => getPhoneTodaySnapshot(zone), listTaskView: o => listTaskView({...o, timezone: zone}), listWeekEvents: o => listWeekEvents({...o, timezone: zone}), listKnowledgeView },
   getResults: () => document.querySelector("#phone-results"),
   renderResults,
   empty,
@@ -306,42 +336,49 @@ function adoptProjection(projection) {
   state.categories = projection.categories;
   state.tags = projection.tags;
 }
+function provisional(p) { return p.timezone !== zone || p.today.metadata?.today !== currentDay(); }
 function renderCachedRoute() {
   const projection = state.cache;
   if (!projection) return false;
-  if (state.route === "today") state.snapshot = projection.today;
+  if (state.route === "today") state.snapshot = provisional(projection) ? provisionalToday(projection, zone) : projection.today;
   else if (state.route === "tasks") {
     const tasks = cachedTasks(projection, { query: state.query.tasks, status: state.status, categoryId: state.category.tasks, tagId: state.tag });
     if (tasks === null) return false;
-    state.items = tasks;
+    state.items = tasks.map(task => ({ ...task, deadlineLabel: dueLabel(task.due_at, new Date(), zone) }));
   } else if (state.route === "calendar") {
-    const events = cachedEvents(projection, state.day);
+    const events = cachedEvents(projection, state.day, zone);
     if (events === null) return false;
     state.items = events;
   } else return false; // Knowledge remains intentionally on-demand.
   renderResults();
+  if (provisional(projection)) setSyncStatus("Cached events · coverage may be incomplete; Today’s tasks need refresh");
   return true;
 }
 async function refreshProjection({ force = false } = {}) {
   if (state.syncing) return;
+  const version = generation;
   state.syncing = true;
-  if (!force) setSyncStatus("Updating…");
+  if (!force && !(state.cache && provisional(state.cache))) setSyncStatus("Updating…");
   try {
     const projection = await refreshPhoneProjection({
-      services: { getPhoneTodaySnapshot, listTaskView, listCategories, listTags, listWeekEvents }, store: projectionStore,
+      services: { getPhoneTodaySnapshot, listTaskView, listCategories, listTags, listWeekEvents }, store: projectionStore, timezone: zone, current: () => generation === version,
     });
+    if (!projection || version !== generation) return;
     adoptProjection(projection);
     setSyncStatus("");
     if (!state.pending) renderCachedRoute();
     syncFilterSelect("Category", state.categories, "All categories");
     syncFilterSelect("Tag", state.tags, "All tags");
   } catch {
-    setSyncStatus(state.cache ? "Offline · cached" : "Offline");
-  } finally { state.syncing = false; }
+    if (generation !== version) return;
+    setSyncStatus(state.cache && provisional(state.cache) ? "Offline · partial events; Today’s tasks need refresh" : state.cache ? "Offline · cached" : "Offline");
+  } finally { if (generation === version) state.syncing = false; }
 }
 async function load() {
+  state.request++;
   if (renderCachedRoute()) { refreshProjection(); return; }
-  return networkLoad();
+  await networkLoad();
+  if (state.cache && provisional(state.cache)) refreshProjection();
 }
 function syncFilterSelect(label, items, allLabel) {
   const select = document.querySelector(`select[aria-label="${label}"]`);
@@ -366,6 +403,7 @@ async function refreshReferenceData() {
   syncFilterSelect("Tag", tags, "All tags");
 }
 async function autoRefresh() {
+  checkZone();
   if (state.pending) return;
   await Promise.allSettled([refreshProjection(), state.cache ? Promise.resolve() : refreshReferenceData()]);
 }
@@ -376,8 +414,8 @@ async function boot() {
   if (cached) adoptProjection(cached);
   showRoute();
   if (cached) {
-    renderCachedRoute();
-    setSyncStatus("Cached");
+    if (!renderCachedRoute()) networkLoad();
+    if (!provisional(cached)) setSyncStatus("Cached");
     refreshProjection();
   } else {
     // Preserve the established first-run Today request, then build the fuller
@@ -385,5 +423,8 @@ async function boot() {
     networkLoad().finally(() => refreshProjection());
   }
 }
+window.addEventListener("focus", checkZone);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkZone(); });
+window.addEventListener("online", autoRefresh);
 boot();
 setInterval(autoRefresh, AUTO_REFRESH_MS);
