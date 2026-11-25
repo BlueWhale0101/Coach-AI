@@ -177,3 +177,27 @@ test("Scriptable entrypoint stores a token in Keychain, uses cached data offline
   assert.equal(labels(rendered).includes("Pay bill"), false);
   assert.ok(labels(rendered).some(value => value.includes("update your token")));
 });
+
+test("compact all-day interval survives the wire and cache across travel and exclusive midnight", async () => {
+  const { compactWidgetToday } = await import("../supabase/functions/_shared/widget-today-api.mjs");
+  const interval = { object_id: "stay", title: "Visit", start_date: "2026-09-26", end_date: "2026-10-01" };
+  const data = compactWidgetToday({
+    metadata: { today: "2026-09-28", timezone: "America/Los_Angeles", generated_at: generated, now: generated },
+    tasks: [], days: ["2026-09-28", "2026-09-29"].map(date => ({date, all_day_events: [interval], timed_events: []})),
+  });
+  assert.equal(data.events.length, 1);
+  assert.equal(data.events[0].date, "2026-09-28", "old clients retain the projected date");
+  assert.deepEqual([data.events[0].start_date, data.events[0].end_date], [interval.start_date, interval.end_date]);
+  const cache = JSON.stringify({ endpoint, snapshot: widget.parseSnapshot({ok:true, data}, data.timezone) });
+  const read = now => widget.snapshotFromCache(cache, endpoint, new Date(now));
+  for (const [now, date] of [["2026-09-26T00:00Z","2026-09-26"], ["2026-09-30T14:29:59Z","2026-09-30"]]) {
+    const view = read(now);
+    assert.ok(view.partial);
+    assert.deepEqual(view.events.map(e => [e.date, e.start_date, e.end_date]), [[date, interval.start_date, interval.end_date]]);
+  }
+  assert.deepEqual(read("2026-09-30T14:30Z").events, [], "Darwin is now on the exclusive end date");
+  assert.equal(read("2026-09-24T00:00Z").events[0].date, interval.start_date, "upcoming event keeps its start date");
+  const legacy = JSON.stringify({ endpoint, snapshot: {...data, events: [{object_id:"stay",title:"Visit",all_day:true,date:"2026-09-28"}]} });
+  assert.equal(widget.snapshotFromCache(legacy, endpoint, new Date("2026-09-28T00:00Z")).events.length, 1);
+  assert.equal(widget.snapshotFromCache(legacy, endpoint, new Date("2026-09-29T00:00Z")).events.length, 0);
+});

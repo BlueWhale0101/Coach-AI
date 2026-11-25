@@ -144,8 +144,13 @@ function snapshotFromCache(raw, endpoint, now = new Date()) {
   if (snapshot.timezone === TIMEZONE && snapshot.date === localDate(now)) return snapshot;
   // A bounded widget snapshot cannot reconstruct the task selection for a different day.
   const date = localDate(now);
-  const events = snapshot.events.filter(e => e.all_day ? e.date >= date : Date.parse(e.ends_at) > now.getTime())
-    .map(e => e.all_day ? e : { ...e, date: localDate(e.starts_at) });
+  const events = snapshot.events.flatMap(e => {
+    if (!e.all_day) return Date.parse(e.ends_at) > now.getTime() ? [{ ...e, date: localDate(e.starts_at) }] : [];
+    // Legacy rows only establish membership on the single projected date.
+    if (!e.start_date || !e.end_date) return e.date >= date ? [e] : [];
+    if (e.end_date <= date) return [];
+    return [{ ...e, date: e.start_date > date ? e.start_date : date }];
+  });
   return { ...snapshot, date, partial: true, tasks: [], events };
 }
 

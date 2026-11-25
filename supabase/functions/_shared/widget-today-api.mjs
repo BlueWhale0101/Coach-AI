@@ -29,7 +29,7 @@ export function compactWidgetToday(board) {
   const selected = allDay.length && timed.length ? [allDay[0], ...timed.slice(0, 2)] : candidates.slice(0, 3);
   const events = selected.map(({ event, date, all_day }) => ({
       object_id: event.object_id, title: event.title, date, all_day,
-      ...(all_day ? {} : { starts_at: event.starts_at, ends_at: event.ends_at }),
+      ...(all_day ? { start_date: event.start_date, end_date: event.end_date } : { starts_at: event.starts_at, ends_at: event.ends_at }),
       category: event.category && { name: event.category.name, color: event.category.color },
       url: "/phone/calendar",
     }));

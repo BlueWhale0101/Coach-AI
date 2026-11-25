@@ -16,7 +16,7 @@ import {
   updateTask as persistUpdateTask,
 } from "./data-provider.mjs";
 import { StagedMutationController } from "./mutation-staging.mjs";
-import { DAY_END_MINUTE, PIXELS_PER_HOUR, formatTime, hourLabels, layoutTimedEvents, minutesToPixels, visibleAllDayItems } from "./calendar-layout.mjs";
+import { DAY_END_MINUTE, PIXELS_PER_HOUR, formatTime, hourLabels, layoutDayEvents, minutesToPixels, visibleAllDayItems } from "./calendar-layout.mjs";
 import { VISIBLE_HOUR_OPTIONS, loadDisplaySettings, normalizeDisplaySettings, resetDisplaySettings, saveDisplaySettings, tintAlpha } from "./display-settings.mjs";
 import { validZone, onDay, addDays, bindTaskDoubleTap, computePaneHourPixels, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, taskActionsForStatus, weekDays, weekRange } from "./view-helpers.mjs";
 
@@ -167,11 +167,6 @@ function updateDisplaySettings(patch, { renderBoard = true } = {}) {
   if (renderBoard) render();
 }
 
-function clipToDay(event, day) {
-  if (!event.starts_at) return event;
-  return { ...event, start: localDateKey(new Date(event.starts_at), zone()) < day ? "00:00" : event.start,
-    end: localDateKey(new Date(event.ends_at), zone()) > day ? "24:00" : event.end };
-}
 function zone() { return state.displaySettings.timezone ?? DEFAULT_TIMEZONE; }
 function reloadZone() { state.weekStart = startOfWeek(new Date(), zone()); loadCurrentView(); }
 function restoreDefaultDisplaySettings() {
@@ -448,6 +443,7 @@ function renderEventCard(event, day) {
   title.textContent = event.title;
   const time = document.createElement("span");
   time.textContent = day.id === "tomorrow" ? event.start : `${formatTime(event.start)}-${formatTime(event.end)}`;
+  if (event.offset) time.textContent += " " + event.offset;
   card.append(title, time);
   card.addEventListener("click", (click) => {
     click.stopPropagation();
@@ -528,7 +524,7 @@ function renderDay(day) {
     line.style.top = `${minutesToPixels(localTimeMinutes(now, zone()), pixelsPerHour)}px`;
     grid.appendChild(line);
   }
-  layoutTimedEvents(day.events.map(e => clipToDay(e, day.date)), pixelsPerHour).forEach(event => grid.appendChild(renderEventCard(event, day)));
+  layoutDayEvents(day.events, day.date, zone(), pixelsPerHour).forEach(event => grid.appendChild(renderEventCard(event, day)));
   column.appendChild(grid);
   return column;
 }
@@ -751,7 +747,7 @@ function renderWeekCalendar() {
       dayGrid.appendChild(line);
     }
     const timed = state.viewItems.filter(event => event.time_kind === "timed" && onDay(event, key, zone()));
-    layoutTimedEvents(timed.map(e => clipToDay(e, key)), currentPixelsPerHour()).forEach(event => dayGrid.appendChild(renderEventCard(event, { id: key, label: key })));
+    layoutDayEvents(timed, key, zone(), currentPixelsPerHour()).forEach(event => dayGrid.appendChild(renderEventCard(event, { id: key, label: key })));
     column.appendChild(dayGrid);
     grid.appendChild(column);
   });
