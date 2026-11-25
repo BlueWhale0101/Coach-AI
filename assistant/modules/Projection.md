@@ -48,11 +48,11 @@ The projection accepts an explicit display timezone. Today and Tomorrow are calc
 
 ## Phone Today read
 
-`assistant_get_phone_today` reuses the household board's bounded task selection and composes four Darwin-local days through the existing day helper. The phone selects attention-worthy tasks and displays today's schedule plus a few upcoming entries. This read creates no task deadlines or durable phone state. The RPC is `SECURITY INVOKER`, executable by `service_role` only, and reached from the browser through the Site's specific `/api/phone-today` allowlist entry.
+`assistant_get_phone_today` reuses the household board's bounded task selection and composes four days in the caller’s display zone through the existing day helper. The phone selects attention-worthy tasks and displays today's schedule plus a few upcoming entries. This read creates no task deadlines or durable phone state. The RPC is `SECURITY INVOKER`, executable by `service_role` only, and reached from the browser through the Site's specific `/api/phone-today` allowlist entry.
 
 ## Phone local projection cache
 
-The phone PWA may retain one versioned IndexedDB record as a client-side cache of a bounded read projection: the Phone Today snapshot, up to 80 open decorated task rows, active category/tag reference rows, and Darwin-local calendar events from the previous day through the following seven days. It is not a durable module, replica, or write authority.
+The phone PWA may retain one versioned IndexedDB record as a client-side cache of a bounded read projection: the Phone Today snapshot, up to 80 open decorated task rows, active category/tag reference rows, and calendar events in the requested display zone from the previous day through the following seven days. It is not a durable module, replica, or write authority.
 
 At startup the phone renders a valid cached record first and refreshes that same bounded projection in the background using existing read capabilities. A successful refresh atomically replaces the record, so completed, deleted, and changed server objects naturally disappear or update. Failure leaves the prior record available and is indicated unobtrusively. Schema-version mismatch or corruption discards the record and rebuilds it from the server. Historical tasks, Knowledge, and calendar navigation outside the cached window retain their existing on-demand reads. Phone writes remain online calls to their owning modules; queued offline mutations are deliberately outside this scope.
 
@@ -79,3 +79,5 @@ If either value is absent, the Site fails closed with a configuration error rath
 The tablet board may stage fast reversible interactions locally before issuing the durable module command. For completion, the UI removes the task immediately, shows an Undo strip, and waits about five seconds. If Undo is pressed, no database command is sent. If the window expires, the UI calls Tasks `complete-task`. If the write fails, the UI restores the task and reports that the change was not saved.
 
 In-app navigation keeps the staged mutation pending. A second mutation flushes the first to the owning capability and leaves Undo available for the second. Closing the page during the staging window still discards the local timer; durable offline delivery is outside V0.
+
+The cache window is [windowStart, windowEnd) in the saved projection timezone; cachedAt records the refresh instant. Timed events retain absolute endpoints; all-day intervals retain date endpoints. A different zone or local day invalidates Today selection, not the saved data. The phone regroups available events immediately and withholds Today tasks until Projection selects them again. A bounded cache (including per-read limits) cannot prove completeness after travel. A failed or superseded refresh leaves the last successful record in place.

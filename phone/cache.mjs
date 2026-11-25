@@ -1,3 +1,4 @@
+import { validZone } from "../tablet-board/view-helpers.mjs";
 // A versioned, single-record cache. It is intentionally a projection cache, not
 // a browser-side copy of Assistant's durable data model.
 export const PHONE_CACHE_SCHEMA = 1;
@@ -8,10 +9,11 @@ const KEY = "current";
 function validDate(value) { return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value); }
 
 export function validPhoneProjection(value) {
-  return Boolean(value && value.schema === PHONE_CACHE_SCHEMA && value.timezone === "Australia/Darwin" &&
+  return Boolean(value && value.schema === PHONE_CACHE_SCHEMA && validZone(value.timezone) && Number.isFinite(Date.parse(value.cachedAt)) &&
     typeof value.cachedAt === "string" && value.today && Array.isArray(value.openTasks) &&
     Array.isArray(value.events) && Array.isArray(value.categories) && Array.isArray(value.tags) &&
-    Array.isArray(value.today.days) && validDate(value.windowStart) && validDate(value.windowEnd));
+    (!value.today.timezone || value.today.timezone === value.timezone) && Array.isArray(value.today.days) &&
+    validDate(value.windowStart) && validDate(value.windowEnd) && value.windowStart < value.windowEnd);
 }
 
 export function createPhoneProjectionStore({ indexedDB = globalThis.indexedDB } = {}) {
@@ -52,9 +54,9 @@ export function createPhoneProjectionStore({ indexedDB = globalThis.indexedDB } 
         return value;
       } catch { return null; }
     },
-    async write(projection) {
+    async write(projection, current = () => true) {
       if (!validPhoneProjection(projection)) throw new Error("Invalid phone projection");
-      try { await transaction("readwrite", store => store.put(projection, KEY)); }
+      try { await transaction("readwrite", store => current() ? store.put(projection, KEY) : store.get(KEY)); }
       catch { /* A private-browsing/storage failure must not break the phone UI. */ }
       return projection;
     },

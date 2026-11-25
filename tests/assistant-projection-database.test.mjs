@@ -238,3 +238,24 @@ test("phone Today projection composes four Darwin days with explicit service rol
   await assert.rejects(() => rows("select public.assistant_get_phone_today(null,'Invalid/Zone',now(),30)"), error => error.code === "22023");
   await assert.rejects(() => rows("select public.assistant_get_phone_today(null,'Australia/Darwin',now(),51)"), error => error.code === "22023");
 });
+
+test("Pacific phone and household board select different civil dates and task horizons from the same stored instants", async () => {
+  const instant = "2027-01-02T06:00:00Z";
+  const appointment = await event("Travel test", instant, "2027-01-02T07:00:00Z");
+  const due = "2027-01-08T10:00:00Z";
+  const blocked = await task("Horizon boundary", due, "2027-01-08T09:00:00Z");
+  const [phone, tablet] = await Promise.all([
+    one("select public.assistant_get_phone_today(null,'America/Los_Angeles',$1,30) as board", [instant]),
+    one("select public.assistant_get_household_board(null,'Australia/Darwin',$1,30) as board", [instant]),
+  ]);
+  for (const [result, date, time] of [[phone, "2027-01-01", "22:00"], [tablet, "2027-01-02", "15:30"]]) {
+    assert.equal(result.board.metadata.today, date);
+    const row = result.board.days[0].timed_events.find(e => e.object_id === appointment.object_id);
+    assert.equal(row.start_time, time);
+    assert.equal(Date.parse(row.starts_at), Date.parse(instant));
+  }
+  assert.ok(!phone.board.tasks.some(t => t.object_id === blocked.object_id));
+  const surfaced = tablet.board.tasks.find(t => t.object_id === blocked.object_id);
+  assert.equal(surfaced.surface_reason, "due_soon");
+  assert.equal(Date.parse(surfaced.due_at), Date.parse(due));
+});

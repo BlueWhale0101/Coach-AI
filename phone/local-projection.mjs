@@ -1,4 +1,5 @@
-import { DEFAULT_TIMEZONE } from "../tablet-board/data-provider.mjs";
+import { onDay } from "../tablet-board/view-helpers.mjs";
+import { timeLabel, DEFAULT_TIMEZONE } from "../tablet-board/data-provider.mjs";
 import { shiftDay, todayKey } from "./view-model.mjs";
 import { PHONE_CACHE_SCHEMA } from "./cache.mjs";
 
@@ -17,27 +18,40 @@ export function cachedTasks(projection, { query = "", status = "open", categoryI
     (!tagId || task.tagObjects?.some(tag => tag.object_id === tagId)));
 }
 
-export function cachedEvents(projection, day) {
-  if (!projection || day < projection.windowStart || day >= projection.windowEnd) return null;
-  return projection.events.filter(event => event.time_kind === "timed"
-    ? event.date === day
-    : event.start_date <= day && event.end_date > day);
+export function cachedEvents(projection, day, zone = projection?.timezone) {
+  if (!projection || (zone === projection.timezone && (day < projection.windowStart || day >= projection.windowEnd))) return null;
+  const rows = projection.events.filter(e => onDay(e, day, zone)).map(e =>
+    e.starts_at ? { ...e, start: timeLabel(e.starts_at, zone), end: timeLabel(e.ends_at, zone) } : e);
+  if (!rows.length && (day < projection.windowStart || day >= projection.windowEnd)) return null;
+  return rows;
 }
 
-export async function refreshPhoneProjection({ services, store, day = todayKey(), now = new Date().toISOString() }) {
+export function provisionalToday(projection, zone, now = new Date()) {
+  const today = todayKey(now, zone);
+  const days = Array.from({ length: 4 }, (_, i) => {
+    const date = shiftDay(today, i);
+    const events = cachedEvents(projection, date, zone) ?? [];
+    return { date, events: events.filter(e => e.time_kind === "timed"), allDay: events.filter(e => e.time_kind === "all_day") };
+  });
+  return { provisional: true, timezone: zone, metadata: { today }, now: now.toISOString(), tasks: [], days };
+}
+
+export async function refreshPhoneProjection({ services, store, timezone = DEFAULT_TIMEZONE, current = () => true, day = todayKey(new Date(), timezone), now = new Date().toISOString() }) {
   const window = projectionWindow(day);
   const [today, openTasks, categories, tags, events] = await Promise.all([
-    services.getPhoneTodaySnapshot(),
-    services.listTaskView({ status: "open", limit: 80 }),
+    services.getPhoneTodaySnapshot(timezone),
+    services.listTaskView({ status: "open", limit: 80, timezone }),
     services.listCategories(),
     services.listTags(),
-    services.listWeekEvents({ weekStart: window.start, weekEnd: window.end, timezone: DEFAULT_TIMEZONE }),
+    services.listWeekEvents({ weekStart: window.start, weekEnd: window.end, timezone }),
   ]);
   const projection = {
-    schema: PHONE_CACHE_SCHEMA, timezone: DEFAULT_TIMEZONE, cachedAt: now,
+    schema: PHONE_CACHE_SCHEMA, timezone, cachedAt: now,
     windowStart: window.start, windowEnd: window.end,
     today, openTasks, categories, tags, events,
   };
-  await store.write(projection);
+  if (!current()) return null;
+  if (today.timezone !== timezone || today.metadata?.today !== day) throw new Error("Unexpected projection time zone");
+  await store.write(projection, current);
   return projection;
 }

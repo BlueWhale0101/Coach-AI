@@ -11,8 +11,8 @@ export const fixtureCategories = {
 
 export const categories = fixtureCategories;
 
-export const DEFAULT_TIMEZONE = "Australia/Darwin";
-import { zonedMidnightUtc } from "./view-helpers.mjs";
+export const DEFAULT_TIMEZONE = householdZone;
+import { householdZone, zonedMidnightUtc } from "./view-helpers.mjs";
 
 function fixtureCategory(id) {
   return fixtureCategories[id] ?? neutralCategory;
@@ -29,9 +29,9 @@ export function localDate(value, timezone = DEFAULT_TIMEZONE) {
   return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
-export function dateLabel(date, timezone = DEFAULT_TIMEZONE) {
+export function dateLabel(date) {
   return new Intl.DateTimeFormat("en-AU", {
-    timeZone: timezone,
+    timeZone: "UTC",
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -110,7 +110,7 @@ export function normalizeProjectionBoard(board) {
       id: day.id,
       label: day.id === "tomorrow" ? "Tomorrow" : "Today",
       date: day.date,
-      dateLabel: dateLabel(day.date, timezone),
+      dateLabel: dateLabel(day.date),
       isToday: day.id === "today",
       allDay: (day.all_day_events ?? []).map(event => ({
         id: event.object_id,
@@ -300,20 +300,20 @@ async function enrichRows(rows, normalizer, options = {}) {
   return rows.map(row => normalizer(row, { ...options, ...decorations[row.object_id] }));
 }
 
-export async function getBoardSnapshot() {
+export async function getBoardSnapshot(timezone = DEFAULT_TIMEZONE) {
   if (isFixtureMode()) return getFixtureBoardSnapshot();
-  const data = await postApi("/api/household-board", { timezone: DEFAULT_TIMEZONE, task_limit: 15 });
+  const data = await postApi("/api/household-board", { timezone, task_limit: 15 });
   return normalizeProjectionBoard(data.board);
 }
 
-export async function getPhoneTodaySnapshot() {
+export async function getPhoneTodaySnapshot(timezone = DEFAULT_TIMEZONE) {
   if (isFixtureMode()) {
     const board = getFixtureBoardSnapshot();
     board.tasks = board.tasks.map(task => ({ ...task, status: "open", surface_reason: task.deadlineLabel ? "due_soon" : "actionable" }));
     board.metadata = { today: board.days[0].date };
     return board;
   }
-  const data = await postApi("/api/phone-today", { timezone: DEFAULT_TIMEZONE, task_limit: 30 });
+  const data = await postApi("/api/phone-today", { timezone, task_limit: 30 });
   return normalizeProjectionBoard(data.board);
 }
 
@@ -332,7 +332,7 @@ export async function cancelTask(objectId) {
   return postApi("/api/cancel-task", { object_id: objectId });
 }
 
-export async function listTaskView({ query = "", status = "open", categoryId = "", tagId = "", limit = 80, offset = 0 } = {}) {
+export async function listTaskView({ timezone = DEFAULT_TIMEZONE, query = "", status = "open", categoryId = "", tagId = "", limit = 80, offset = 0 } = {}) {
   if (isFixtureMode()) {
     const source = getFixtureBoardSnapshot().tasks.map(task => ({ ...task, status: "open" }));
     return source
@@ -347,12 +347,12 @@ export async function listTaskView({ query = "", status = "open", categoryId = "
     const filtered = tagId
       ? await postApi("/api/tagged-tasks", { tag_id: tagId, category_id: categoryId || null, status: status || null, query: query.trim() || null, limit, offset })
       : await postApi("/api/category-view", { object_type: "task", category_id: categoryId, status: status || null, query: query.trim() || null, limit, offset });
-    return (filtered.rows ?? []).map(row => normalizeTaskRow(row, { now, timezone: DEFAULT_TIMEZONE, classification: row.classification, pinned: row.pinned }));
+    return (filtered.rows ?? []).map(row => normalizeTaskRow(row, { now, timezone, classification: row.classification, pinned: row.pinned }));
   }
   const data = query.trim()
     ? await postApi("/api/search-tasks", { ...body, query: query.trim() })
     : await postApi("/api/list-tasks", body);
-  return enrichRows(data.tasks, normalizeTaskRow, { now, timezone: DEFAULT_TIMEZONE });
+  return enrichRows(data.tasks, normalizeTaskRow, { now, timezone });
 }
 
 export async function pinObject(objectId) {

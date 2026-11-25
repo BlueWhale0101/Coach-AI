@@ -632,3 +632,5 @@ The checked 15-case utterance suite is a set of golden behavioral
 specifications/fixtures for intended tool sequences. It does not execute a
 model; actual model-selection evaluation remains blocked until the MCP server
 can be connected to ChatGPT developer mode.
+
+Display clients pass their resolved IANA identifier via the existing board/phone `timezone` argument. Calendar range reads use exclusive civil dates for all-day intervals and the corresponding absolute boundaries for timed overlap. The read-only widget GET accepts a single optional `timezone` query parameter, retaining Australia/Darwin when omitted; its response reports Projection's actual zone. See [widget interface](WidgetClient.md).

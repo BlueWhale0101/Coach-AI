@@ -91,3 +91,5 @@ Development rules:
 - Before merge, review database privileges, RLS posture, Edge Function authentication, and compatibility with Coach.AI.
 - After merge, verify the live Supabase state and run relevant integration checks/advisors.
 - Never rewrite an already-applied migration to represent a later production change. Add a new forward migration so repository history and Supabase migration history remain reproducible.
+
+Display time zone is a client preference. Scheduling owns event instants, event zone metadata and exclusive date-only intervals; Recurrence and Reminders keep their own rule and trigger semantics. Projection selects civil days and task horizons in the requested zone. Presentation uses that same zone; changing it is a read, never a household update. See [Projection](modules/Projection.md) and [display settings and upgrade checks](../docs/display-time-zone.md).

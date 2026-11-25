@@ -425,3 +425,5 @@ Next planned work:
 ## Tablet PWA installation
 
 See [Android tablet installation and deployment checks](docs/tablet-pwa.md) for the existing Assistant.AI household display.
+
+Assistant.AI phone, tablet and widget: [display time zone settings, offline behavior and upgrade checks](docs/display-time-zone.md).

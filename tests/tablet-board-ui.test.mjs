@@ -5,6 +5,7 @@ import { getFixtureBoardSnapshot, categories } from "../tablet-board/data-provid
 import {
   PIXELS_PER_HOUR,
   layoutTimedEvents,
+  layoutDayEvents,
   parseTimeToMinutes,
   visibleAllDayItems,
 } from "../tablet-board/calendar-layout.mjs";
@@ -204,4 +205,34 @@ test("tablet board refreshes its current projection every five minutes without i
   assert.match(source, /if \(state\.pendingMutation\) return/);
   assert.match(source, /loadTaskView\(\{ preserveControls: true \}\)/);
   assert.match(source, /loadKnowledgeView\(\{ preserveControls: true \}\)/);
+});
+
+test("spring gap renders two 30-minute pieces with no card in the missing hour", () => {
+  const event = { id: "trip", starts_at: "2026-03-08T09:30:00Z", ends_at: "2026-03-08T10:30:00Z" };
+  const pieces = layoutDayEvents([event], "2026-03-08", "America/Los_Angeles", 60);
+  assert.deepEqual(pieces.map(p => [p.top, p.height, p.start, p.end, p.offset]), [
+    [90, 30, "01:30", "02:00", "GMT-8"], [180, 30, "03:00", "03:30", "GMT-7"]
+  ]);
+  assert.ok(pieces.every(p => p.id === event.id && p.starts_at === event.starts_at && p.ends_at === event.ends_at));
+  const [edge] = layoutDayEvents([{ ...event, starts_at: "2026-03-08T09:59:00Z", ends_at: "2026-03-08T10:00:00Z" }],
+    "2026-03-08", "America/Los_Angeles", 60);
+  assert.equal(edge.top + edge.height, 120, "minimum card height must not paint into the gap");
+});
+
+test("fall fold renders 90 elapsed minutes even when the clock advances only 30", () => {
+  const event = { id: "fold", starts_at: "2026-11-01T08:15:00Z", ends_at: "2026-11-01T09:45:00Z" };
+  const pieces = layoutDayEvents([event], "2026-11-01", "America/Los_Angeles", 60);
+  assert.deepEqual(pieces.map(p => [p.top, p.height, p.widthPercent, p.offset]), [
+    [60, 45, 50, "GMT-8"], [75, 45, 50, "GMT-7"],
+  ]);
+  assert.notEqual(pieces[0].leftPercent, pieces[1].leftPercent);
+  assert.ok(pieces.every(p => p.id === event.id && p.starts_at === event.starts_at && p.ends_at === event.ends_at));
+});
+
+test("overnight placement clips at midnight on either side of a spring transition", () => {
+  const events = [{ starts_at: "2026-03-08T07:00:00Z", ends_at: "2026-03-09T07:00:00Z" }];
+  const render = day => layoutDayEvents(events, day, "America/Los_Angeles", 60);
+  assert.deepEqual(render("2026-03-07").map(p => [p.top, p.height]), [[1380, 60]]);
+  assert.deepEqual(render("2026-03-08").map(p => [p.top, p.height]), [[0, 120], [180, 1260]]);
+  assert.deepEqual(render("2026-03-09"), []);
 });

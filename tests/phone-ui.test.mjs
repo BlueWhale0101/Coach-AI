@@ -107,7 +107,7 @@ test("phone projection cache supplies decorated open tasks and local Darwin cale
       { object_id: "other", title: "Shop", description: "Milk", status: "open", category: { id: "errands" }, tags: [], tagObjects: [] },
     ],
     events: [
-      { object_id: "midnight", time_kind: "timed", date: "2026-09-27", starts_at: "2026-09-26T14:45:00Z" },
+      { object_id: "midnight", time_kind: "timed", date: "2026-09-27", starts_at: "2026-09-26T14:45:00Z", ends_at: "2026-09-26T15:45:00Z" },
       { object_id: "span", time_kind: "all_day", start_date: "2026-09-26", end_date: "2026-09-28" },
     ],
   };
@@ -123,8 +123,8 @@ test("phone projection cache supplies decorated open tasks and local Darwin cale
 test("background phone projection refresh atomically replaces stale rows and retains only the bounded decorated working set", async () => {
   const writes = [];
   const services = {
-    getPhoneTodaySnapshot: async () => ({ metadata: { today: "2026-09-27" }, days: [], tasks: [] }),
-    listTaskView: async options => { assert.deepEqual(options, { status: "open", limit: 80 }); return [{ object_id: "fresh", tags: ["travel"], tagObjects: [{ object_id: "tag", name: "travel" }], pinned: true }]; },
+    getPhoneTodaySnapshot: async () => ({ timezone: "Australia/Darwin", metadata: { today: "2026-09-27" }, days: [], tasks: [] }),
+    listTaskView: async options => { assert.deepEqual(options, { status: "open", limit: 80, timezone: "Australia/Darwin" }); return [{ object_id: "fresh", tags: ["travel"], tagObjects: [{ object_id: "tag", name: "travel" }], pinned: true }]; },
     listCategories: async () => [{ object_id: "cat", name: "Home" }],
     listTags: async () => [{ object_id: "tag", name: "travel" }],
     listWeekEvents: async options => { assert.equal(options.weekStart, "2026-09-26"); assert.equal(options.weekEnd, "2026-10-05"); return [{ object_id: "event", time_kind: "timed", date: "2026-09-27" }]; },

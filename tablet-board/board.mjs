@@ -16,9 +16,9 @@ import {
   updateTask as persistUpdateTask,
 } from "./data-provider.mjs";
 import { StagedMutationController } from "./mutation-staging.mjs";
-import { DAY_END_MINUTE, PIXELS_PER_HOUR, formatTime, hourLabels, layoutTimedEvents, minutesToPixels, visibleAllDayItems } from "./calendar-layout.mjs";
+import { DAY_END_MINUTE, PIXELS_PER_HOUR, formatTime, hourLabels, layoutDayEvents, minutesToPixels, visibleAllDayItems } from "./calendar-layout.mjs";
 import { VISIBLE_HOUR_OPTIONS, loadDisplaySettings, normalizeDisplaySettings, resetDisplaySettings, saveDisplaySettings, tintAlpha } from "./display-settings.mjs";
-import { addDays, bindTaskDoubleTap, computePaneHourPixels, eventDateKey, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, taskActionsForStatus, weekDays, weekRange } from "./view-helpers.mjs";
+import { validZone, onDay, addDays, bindTaskDoubleTap, computePaneHourPixels, isoDate, localDateKey, localTimeMinutes, pathForRoute, routeFromPath, startOfWeek, taskActionsForStatus, weekDays, weekRange } from "./view-helpers.mjs";
 
 const STAGE_DELAY_MS = 5000;
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
@@ -34,7 +34,7 @@ const state = {
   viewItems: [],
   categories: [],
   tags: [],
-  weekStart: startOfWeek(new Date()),
+  weekStart: startOfWeek(new Date(), loadDisplaySettings().timezone ?? DEFAULT_TIMEZONE),
   loading: true,
   viewLoading: false,
   error: null,
@@ -167,10 +167,12 @@ function updateDisplaySettings(patch, { renderBoard = true } = {}) {
   if (renderBoard) render();
 }
 
+function zone() { return state.displaySettings.timezone ?? DEFAULT_TIMEZONE; }
+function reloadZone() { state.weekStart = startOfWeek(new Date(), zone()); loadCurrentView(); }
 function restoreDefaultDisplaySettings() {
   state.displaySettings = resetDisplaySettings();
   state.measuredHourPixels = PIXELS_PER_HOUR;
-  render();
+  reloadZone();
 }
 
 function formatHour(hour) {
@@ -441,6 +443,7 @@ function renderEventCard(event, day) {
   title.textContent = event.title;
   const time = document.createElement("span");
   time.textContent = day.id === "tomorrow" ? event.start : `${formatTime(event.start)}-${formatTime(event.end)}`;
+  if (event.offset) time.textContent += " " + event.offset;
   card.append(title, time);
   card.addEventListener("click", (click) => {
     click.stopPropagation();
@@ -518,10 +521,10 @@ function renderDay(day) {
     const now = new Date(state.snapshot?.now ?? new Date());
     const line = document.createElement("div");
     line.className = "now-line";
-    line.style.top = `${minutesToPixels(now.getHours() * 60 + now.getMinutes(), pixelsPerHour)}px`;
+    line.style.top = `${minutesToPixels(localTimeMinutes(now, zone()), pixelsPerHour)}px`;
     grid.appendChild(line);
   }
-  layoutTimedEvents(day.events, pixelsPerHour).forEach(event => grid.appendChild(renderEventCard(event, day)));
+  layoutDayEvents(day.events, day.date, zone(), pixelsPerHour).forEach(event => grid.appendChild(renderEventCard(event, day)));
   column.appendChild(grid);
   return column;
 }
@@ -677,7 +680,7 @@ function renderWeekView() {
   const previous = button("Previous week");
   previous.addEventListener("click", () => { state.weekStart = addDays(state.weekStart, -7); loadCalendarView(); });
   const current = button("Current week", "solid-button");
-  current.addEventListener("click", () => { state.weekStart = startOfWeek(new Date()); loadCalendarView(); });
+  current.addEventListener("click", () => { state.weekStart = startOfWeek(new Date(), zone()); loadCalendarView(); });
   const next = button("Next week");
   next.addEventListener("click", () => { state.weekStart = addDays(state.weekStart, 7); loadCalendarView(); });
   nav.append(previous, current, next);
@@ -736,15 +739,15 @@ function renderWeekCalendar() {
       line.style.top = `${hour.top}px`;
       dayGrid.appendChild(line);
     });
-    if (key === localDateKey(new Date(), DEFAULT_TIMEZONE)) {
+    if (key === localDateKey(new Date(), zone())) {
       const now = new Date();
       const line = document.createElement("div");
       line.className = "now-line";
-      line.style.top = `${minutesToPixels(localTimeMinutes(now, DEFAULT_TIMEZONE), currentPixelsPerHour())}px`;
+      line.style.top = `${minutesToPixels(localTimeMinutes(now, zone()), currentPixelsPerHour())}px`;
       dayGrid.appendChild(line);
     }
-    const timed = state.viewItems.filter(event => event.time_kind === "timed" && eventDateKey(event) === key);
-    layoutTimedEvents(timed, currentPixelsPerHour()).forEach(event => dayGrid.appendChild(renderEventCard(event, { id: key, label: key })));
+    const timed = state.viewItems.filter(event => event.time_kind === "timed" && onDay(event, key, zone()));
+    layoutDayEvents(timed, key, zone(), currentPixelsPerHour()).forEach(event => dayGrid.appendChild(renderEventCard(event, { id: key, label: key })));
     column.appendChild(dayGrid);
     grid.appendChild(column);
   });
@@ -961,7 +964,15 @@ function renderDisplaySettings() {
   );
   const reset = button("Reset display settings", "reset-button");
   reset.addEventListener("click", restoreDefaultDisplaySettings);
-  form.appendChild(reset);
+  const zoneButton = button("Display time zone: " + zone(), "reset-button");
+  zoneButton.onclick = () => {
+    const input = prompt("IANA time zone (blank for household)", settings.timezone || "");
+    if (input === null) return;
+    const timezone = input.trim();
+    if (timezone && !validZone(timezone)) return alert("Use a zone such as America/Los_Angeles.");
+    updateDisplaySettings({ timezone }, { renderBoard: false }); reloadZone();
+  };
+  form.append(zoneButton, reset);
   wrap.appendChild(form);
   return wrap;
 }
@@ -1021,7 +1032,7 @@ async function loadBoard() {
   state.error = null;
   render();
   try {
-    const snapshot = await getBoardSnapshot();
+    const snapshot = await getBoardSnapshot(zone());
     if (request !== viewRequest || state.route !== "board") return;
     state.snapshot = snapshot;
   } catch (error) {
@@ -1049,7 +1060,7 @@ async function loadTaskView({ preserveControls = false } = {}) {
   if (preserveControls) renderListOnly(); else render();
   try {
     await loadChromeData();
-    const items = await listTaskView({ ...state.filters.tasks });
+    const items = await listTaskView({ timezone: zone(), ...state.filters.tasks });
     if (request !== viewRequest || state.route !== "tasks") return;
     state.viewItems = items;
   } catch (error) {
@@ -1071,7 +1082,7 @@ async function loadCalendarView() {
   render();
   try {
     const range = weekRange(state.weekStart);
-    const items = await listWeekEvents({ weekStart: range.start, weekEnd: range.endExclusive, timezone: DEFAULT_TIMEZONE });
+    const items = await listWeekEvents({ weekStart: range.start, weekEnd: range.endExclusive, timezone: zone() });
     if (request !== viewRequest || state.route !== "calendar") return;
     state.viewItems = items;
   } catch (error) {
